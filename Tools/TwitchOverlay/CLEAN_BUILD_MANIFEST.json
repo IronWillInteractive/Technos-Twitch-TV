@@ -1,0 +1,28 @@
+{
+  "name": "TwitchOverlay_Hotfix_LocalCache_App",
+  "build": "hotfix-local-cache-baked-client",
+  "createdAt": "2026-05-19",
+  "activeRoutes": [
+    "index.html",
+    "OverlayBuilder/OverlayTools.html",
+    "StreamManager/StreamManager.html",
+    "Dashboard/dashboard.html",
+    "ClientViewer/index.html"
+  ],
+  "clientOutputShape": [
+    "<streamer>_StreamClient/index.html",
+    "<streamer>_StreamClient/viewer/index.html"
+  ],
+  "assetWorkflow": [
+    "png",
+    "png-frameset-zip",
+    "self-contained-html"
+  ],
+  "removedFromActiveWorkflow": [
+    "svg"
+  ],
+  "tools": [
+    "Tools/Publish_StreamClient_To_GitHub.bat",
+    "Tools/End_Stream_Cleanup.bat"
+  ]
+}

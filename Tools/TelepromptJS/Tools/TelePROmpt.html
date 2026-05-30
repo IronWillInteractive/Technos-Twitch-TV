@@ -1,0 +1,1366 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="description" content="PRO-CRAWL OS is a professional local teleprompter studio with saved script presets, fullscreen prompting, touch/mobile controls, mirrored glass mode, and offline-friendly localStorage workflows.">
+    <meta name="keywords" content="teleprompter, local teleprompter, browser teleprompter, script reader, video production, mobile teleprompter, PRO-CRAWL OS">
+    <meta name="author" content="Iron Will Interactive">
+    <meta name="theme-color" content="#050505">
+    <meta name="color-scheme" content="dark">
+    <meta property="og:title" content="PRO-CRAWL OS | Professional Teleprompter System">
+    <meta property="og:description" content="A professional local teleprompter studio with saved presets, mirrored glass mode, fullscreen prompting, and mobile/touch support.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="../assets/img/social-preview.svg">
+    <meta name="twitter:card" content="summary_large_image">
+    <link rel="canonical" href="./TelePROmpt.html">
+    <title>PRO-CRAWL OS | Professional Teleprompter System</title>
+    <!-- Tailwind CSS for modern interface -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for rich typographic choices -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@300;400;600;800&family=Lexend+Deca:wght@300;400;600;800&family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Space+Grotesk:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom scrollbars for slick dark look */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #111827;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #4B5563;
+        }
+        /* Custom Font Assignments */
+        .font-sans-inter { font-family: 'Inter', sans-serif; }
+        .font-sans-lexend { font-family: 'Lexend Deca', sans-serif; }
+        .font-serif-playfair { font-family: 'Playfair Display', serif; }
+        .font-mono-courier { font-family: 'Courier Prime', monospace; }
+        .font-tech-space { font-family: 'Space Grotesk', sans-serif; }
+
+        /* Smooth hardware-accelerated scroll container */
+        #prompter-scroll-area {
+            scroll-behavior: auto;
+            -webkit-overflow-scrolling: touch;
+            position: relative;
+            z-index: 1;
+        }
+
+        /*
+            HOTPATCH:
+            The focus guide is anchored to the prompter viewport instead of the
+            scrolling crawl content, so it stays centered while text moves beneath.
+        */
+        #focus-indicator-band {
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            z-index: 30 !important;
+        }
+
+        #prompter-text-container {
+            position: relative;
+            z-index: 1;
+        }
+        /* Mirroring Transforms */
+        .mirror-horizontal {
+            transform: scaleX(-1);
+        }
+        .mirror-vertical {
+            transform: scaleY(-1);
+        }
+        .mirror-both {
+            transform: scale(-1, -1);
+        }
+    </style>
+    <link rel="stylesheet" href="../assets/css/procrawl.css">
+    <link rel="stylesheet" href="../assets/css/mobile.css">
+</head>
+<body data-page="teleprompter" class="bg-gray-950 text-gray-100 font-sans-inter overflow-hidden h-screen flex flex-col selection:bg-emerald-500 selection:text-black">
+
+<header class="bg-gray-900 border-b border-gray-800 px-6 py-3 flex flex-wrap justify-between items-center z-10 gap-4 shrink-0 shadow-lg">
+    <div class="flex items-center gap-3">
+        <div class="h-3 w-3 rounded-full bg-emerald-500 animate-pulse" id="status-indicator-dot"></div>
+        <span class="font-extrabold text-lg tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400">PRO-CRAWL OS v4.0</span>
+        <span class="text-xs bg-gray-800 text-gray-400 px-2.5 py-1 rounded-full border border-gray-700 font-mono tracking-tight" id="status-text">STATUS: STANDBY</span>
+    </div>
+
+    <!-- Live Stats -->
+    <div class="flex items-center gap-6 text-sm text-gray-400 font-mono">
+        <div>
+            <span class="text-gray-600">WORDS:</span> 
+            <span id="stat-wordcount" class="text-gray-300 font-semibold">0</span>
+        </div>
+        <div>
+            <span class="text-gray-600">EST. TIME:</span> 
+            <span id="stat-esttime" class="text-gray-300 font-semibold">00:00</span>
+        </div>
+        <div>
+            <span class="text-gray-600">ELAPSED:</span> 
+            <span id="stat-elapsed" class="text-emerald-400 font-bold">00:00</span>
+        </div>
+        <div>
+            <span class="text-gray-600">PROGRESS:</span> 
+            <span id="stat-progress" class="text-cyan-400 font-bold">0%</span>
+        </div>
+    </div>
+
+    <div class="flex items-center gap-2">
+        <button id="btn-fullscreen" class="bg-gray-800 hover:bg-gray-700 text-gray-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition border border-gray-700 active:scale-95" title="Toggle Fullscreen (F)">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75v4.5m0-4.5h-4.5m4.5 0L15 9m5.25 11.25v-4.5m0 4.5h-4.5m4.5 0l-6-6" />
+            </svg>
+            <span>FULLSCREEN</span>
+        </button>
+        <button id="btn-toggle-panel" class="bg-emerald-600 hover:bg-emerald-500 text-black px-3.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition active:scale-95">
+            <span id="panel-btn-text">HIDE CONTROLS</span>
+        </button>
+    </div>
+</header>
+
+<div class="flex-1 flex overflow-hidden relative" id="workspace">
+
+    <!-- Sidebar controls and script editing -->
+    <aside id="control-panel" class="w-96 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 h-full transition-all duration-300 overflow-y-auto">
+        
+        <!-- Tab Selectors -->
+        <div class="flex border-b border-gray-800 sticky top-0 bg-gray-900 z-10">
+            <button id="tab-script-btn" class="flex-1 py-3 text-center text-xs font-bold tracking-wider border-b-2 border-emerald-500 text-emerald-400 transition bg-gray-900/50">SCRIPT EDITOR</button>
+            <button id="tab-config-btn" class="flex-1 py-3 text-center text-xs font-bold tracking-wider border-b-2 border-transparent text-gray-400 hover:text-gray-200 transition">SYSTEM ENGINE</button>
+        </div>
+
+        <!-- Script Editor Tab Content -->
+        <div id="tab-script" class="p-5 flex flex-col gap-4 flex-1">
+            <div class="flex justify-between items-center gap-3">
+                <label for="script-input" class="text-xs font-bold text-gray-400 tracking-wider">ENTER SCRIPT BELOW</label>
+                <div class="relative">
+                    <select id="preset-select" class="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-xs text-gray-300 font-semibold focus:outline-none focus:border-emerald-500 min-w-[160px]">
+                        <option value="">-- Load Preset --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="bg-gray-950 border border-gray-800 rounded-xl p-3.5 flex flex-col gap-3">
+                <div class="flex items-center justify-between">
+                    <h4 class="text-xs font-bold text-cyan-400 tracking-wider">PRESET LIBRARY</h4>
+                    <button id="btn-new-preset" class="bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-200 px-2.5 py-1 rounded-lg text-[10px] font-bold transition active:scale-95">NEW</button>
+                </div>
+
+                <div class="flex gap-2">
+                    <input id="preset-title-input" type="text" class="flex-1 bg-gray-900 border border-gray-800 rounded-lg px-3 py-2 text-xs text-gray-200 focus:outline-none focus:ring-1 focus:ring-emerald-500" placeholder="Preset title...">
+                    <button id="btn-save-preset" class="bg-emerald-500 hover:bg-emerald-400 text-black px-3 py-2 rounded-lg text-xs font-extrabold transition active:scale-95">SAVE</button>
+                </div>
+
+                <div id="preset-card-list" class="grid gap-2 max-h-48 overflow-y-auto pr-1"></div>
+                <p class="text-[10px] text-gray-500 leading-relaxed">Saved presets stay in this browser with localStorage. Built-in presets can be loaded or copied, but not deleted.</p>
+            </div>
+
+            <textarea id="script-input" class="w-full flex-1 min-h-[260px] bg-gray-950 border border-gray-800 rounded-xl p-4 text-gray-200 font-sans-inter text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none leading-relaxed" placeholder="Type or paste your badass broadcast script here..."></textarea>
+
+            <div class="p-3.5 bg-gray-950 border border-gray-800 rounded-xl">
+                <h4 class="text-xs font-bold text-emerald-400 mb-2">HOTKEY CHEATSHEET:</h4>
+                <div class="grid grid-cols-2 gap-2 text-[11px] font-mono text-gray-400">
+                    <div><b class="text-gray-200">Space:</b> Play/Pause</div>
+                    <div><b class="text-gray-200">Arrow Up:</b> Speed +</div>
+                    <div><b class="text-gray-200">Arrow Down:</b> Speed -</div>
+                    <div><b class="text-gray-200">R:</b> Reset Script</div>
+                    <div><b class="text-gray-200">F:</b> Fullscreen</div>
+                    <div><b class="text-gray-200">M:</b> Mirror (H)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Configuration Settings Tab -->
+        <div id="tab-config" class="p-5 flex flex-col gap-6 hidden">
+            
+            <!-- Teleprompter Presets & Layout Controls -->
+            <div class="flex flex-col gap-3">
+                <h3 class="text-xs font-bold text-gray-400 tracking-wider">MOTION ENGINE</h3>
+                <div class="bg-gray-950 border border-gray-800 rounded-xl p-4 flex flex-col gap-4">
+                    <!-- Speed -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold">
+                            <span class="text-gray-400">SCROLL SPEED</span>
+                            <span id="val-speed" class="text-emerald-400 font-mono text-sm">3.5</span>
+                        </div>
+                        <input type="range" id="input-speed" min="0" max="15" step="0.1" value="3.5" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    </div>
+                    <!-- Starting Delay -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold">
+                            <span class="text-gray-400">COUNTDOWN DELAY</span>
+                            <span id="val-countdown" class="text-emerald-400 font-mono text-sm">3s</span>
+                        </div>
+                        <input type="range" id="input-countdown" min="0" max="10" step="1" value="3" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Typography & Sizing Controls -->
+            <div class="flex flex-col gap-3">
+                <h3 class="text-xs font-bold text-gray-400 tracking-wider">TYPOGRAPHY & READABILITY</h3>
+                <div class="bg-gray-950 border border-gray-800 rounded-xl p-4 flex flex-col gap-4">
+                    <!-- Font Family Selector -->
+                    <div>
+                        <label for="select-font" class="block text-xs font-bold text-gray-400 mb-1.5">FONT FAMILY</label>
+                        <select id="select-font" class="w-full bg-gray-900 border border-gray-800 rounded-lg p-2.5 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-emerald-500">
+                            <option value="font-sans-inter">Inter Sans-Serif</option>
+                            <option value="font-sans-lexend">Lexend Clean</option>
+                            <option value="font-serif-playfair">Playfair Modern Serif</option>
+                            <option value="font-mono-courier">Courier Broadcast Monospace</option>
+                            <option value="font-tech-space">Space Grotesk (Tech)</option>
+                        </select>
+                    </div>
+
+                    <!-- Font Size Slider -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold">
+                            <span class="text-gray-400">FONT SIZE</span>
+                            <span id="val-fontsize" class="text-emerald-400 font-mono text-sm">55px</span>
+                        </div>
+                        <input type="range" id="input-fontsize" min="20" max="120" step="1" value="55" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    </div>
+
+                    <!-- Line Height Slider -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold">
+                            <span class="text-gray-400">LINE SPACING</span>
+                            <span id="val-lineheight" class="text-emerald-400 font-mono text-sm">1.5x</span>
+                        </div>
+                        <input type="range" id="input-lineheight" min="1.0" max="2.5" step="0.1" value="1.5" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    </div>
+
+                    <!-- Content Margin/Width Adjuster -->
+                    <div>
+                        <div class="flex justify-between text-xs mb-1.5 font-bold">
+                            <span class="text-gray-400">READING TRACK WIDTH</span>
+                            <span id="val-trackwidth" class="text-emerald-400 font-mono text-sm">80%</span>
+                        </div>
+                        <input type="range" id="input-trackwidth" min="30" max="100" step="5" value="80" class="w-full h-1.5 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stylistic & Color Controls -->
+            <div class="flex flex-col gap-3">
+                <h3 class="text-xs font-bold text-gray-400 tracking-wider">COLOR SPECTRUM</h3>
+                <div class="bg-gray-950 border border-gray-800 rounded-xl p-4 flex flex-col gap-4">
+                    <!-- Presets Selection for Color Palette -->
+                    <div class="grid grid-cols-3 gap-2">
+                        <button type="button" class="color-preset-btn text-[10px] font-bold py-1 px-1.5 border border-emerald-500 text-emerald-400 rounded-lg hover:bg-emerald-500/10 active:scale-95 transition" data-bg="#000000" data-text="#34d399">Matrix</option>
+                        <button type="button" class="color-preset-btn text-[10px] font-bold py-1 px-1.5 border border-white text-white rounded-lg hover:bg-white/10 active:scale-95 transition" data-bg="#0a0a0a" data-text="#ffffff">High Contrast</option>
+                        <button type="button" class="color-preset-btn text-[10px] font-bold py-1 px-1.5 border border-amber-500 text-amber-400 rounded-lg hover:bg-amber-500/10 active:scale-95 transition" data-bg="#1e130c" data-text="#f59e0b">Warm Sunset</option>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4.5 pt-2">
+                        <!-- BG Color Custom Pick -->
+                        <div>
+                            <label for="color-bg" class="block text-xs font-bold text-gray-400 mb-1.5">BACKGROUND</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="color-bg" value="#050505" class="w-10 h-10 border border-gray-800 bg-transparent rounded-lg cursor-pointer">
+                                <span id="lbl-color-bg" class="text-xs font-mono text-gray-300 uppercase">#050505</span>
+                            </div>
+                        </div>
+                        <!-- Text Color Custom Pick -->
+                        <div>
+                            <label for="color-text" class="block text-xs font-bold text-gray-400 mb-1.5">TEXT COLOR</label>
+                            <div class="flex items-center gap-2">
+                                <input type="color" id="color-text" value="#ffffff" class="w-10 h-10 border border-gray-800 bg-transparent rounded-lg cursor-pointer">
+                                <span id="lbl-color-text" class="text-xs font-mono text-gray-300 uppercase">#FFFFFF</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Broadcast Features -->
+            <div class="flex flex-col gap-3">
+                <h3 class="text-xs font-bold text-gray-400 tracking-wider">HARDWARE & GLASS GLASSES</h3>
+                <div class="bg-gray-950 border border-gray-800 rounded-xl p-4 flex flex-col gap-3.5">
+                    
+                    <!-- Mirror Mode (Horizontal & Vertical Flipping) -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-2">GLASS REFLECTION MIRROR</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button id="btn-mirror-h" class="bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-lg py-2 text-xs font-bold transition flex items-center justify-center gap-1.5">
+                                <span>Mirror Horiz (X)</span>
+                            </button>
+                            <button id="btn-mirror-v" class="bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-lg py-2 text-xs font-bold transition flex items-center justify-center gap-1.5">
+                                <span>Mirror Vert (Y)</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Highlight Guides (Focus lines, shade) -->
+                    <div class="border-t border-gray-800 pt-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-bold text-gray-400">FOCUS GUIDE ALIGNER</span>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="toggle-focus-bar" class="sr-only peer" checked>
+                                <div class="w-9 h-5 bg-gray-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-gray-300 after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-500"></div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Focus Shade Overlay Settings -->
+                    <div id="focus-bar-controls" class="flex flex-col gap-2 pt-1">
+                        <div>
+                            <div class="flex justify-between text-[11px] mb-1 font-bold">
+                                <span class="text-gray-500">GUIDE OPACITY</span>
+                                <span id="val-focus-opacity" class="text-gray-300 font-mono">20%</span>
+                            </div>
+                            <input type="range" id="input-focus-opacity" min="5" max="90" step="5" value="20" class="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                        </div>
+                        <div>
+                            <label for="color-focus-bar" class="block text-[11px] font-bold text-gray-500 mb-1">GUIDE COLOR</label>
+                            <input type="color" id="color-focus-bar" value="#10b981" class="w-full h-7 bg-transparent border border-gray-800 rounded cursor-pointer">
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+    </aside>
+
+    <!-- Prompter Viewport & Display Area -->
+    <main class="flex-1 flex flex-col relative h-full bg-black select-none" id="prompter-viewport">
+        
+        <!-- Big Ready / Countdown Overlay Screen -->
+        <div id="countdown-overlay" class="absolute inset-0 bg-black/95 z-20 flex flex-col items-center justify-center text-center opacity-0 pointer-events-none transition-opacity duration-300">
+            <span class="text-xs font-mono font-bold tracking-[0.25em] text-emerald-400 mb-2">LIVE TRANSMISSION INBOUND</span>
+            <div id="countdown-number" class="text-[14rem] font-bold leading-none font-tech-space text-white">3</div>
+            <span class="text-sm font-semibold text-gray-400 mt-4 tracking-wider">READY YOUR POISE & BREATHING</span>
+            <button id="btn-cancel-countdown" class="mt-8 bg-red-600/20 text-red-400 border border-red-500/30 hover:bg-red-600/40 px-5 py-2 rounded-xl text-xs font-semibold tracking-wider transition">CANCEL START</button>
+        </div>
+
+        <!-- Scroll Canvas Wrapper -->
+        <div id="prompter-scroll-area" class="flex-1 overflow-y-auto px-6 relative w-full flex flex-col items-center justify-start py-[35vh]">
+            
+            <!-- Floating Focus Guideline (Fixed on Screen absolute coordinate centered dynamically) -->
+            <!-- We build CSS horizontal highlight pointers sticking to the viewport, which frame the text correctly -->
+            <div id="focus-indicator-band" class="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-[120px] pointer-events-none z-10 transition-colors duration-300 flex justify-between items-center px-4" style="background-color: rgba(16, 185, 129, 0.20);">
+                <!-- Left arrow guide pointer -->
+                <div class="w-6 h-6 border-t-4 border-l-4 border-emerald-400 rotate-45 transform origin-center" id="guide-bracket-l"></div>
+                <!-- Right arrow guide pointer -->
+                <div class="w-6 h-6 border-b-4 border-r-4 border-emerald-400 rotate-45 transform origin-center" id="guide-bracket-r"></div>
+            </div>
+
+            <!-- The Real Scrolling Text Body -->
+            <div id="prompter-text-container" class="w-[80%] mx-auto font-sans-inter text-white font-semibold whitespace-pre-line text-center transition-all duration-300 origin-center select-none" style="font-size: 55px; line-height: 1.5; outline: none;">
+                <!-- Loaded on fly -->
+            </div>
+
+        </div>
+
+        <!-- Footer / Floating Control overlay -->
+        <div id="floating-bar" class="absolute bottom-6 left-1/2 -translate-x-1/2 bg-gray-900/90 border border-gray-800 backdrop-blur-xl py-3.5 px-6 rounded-2xl flex items-center justify-between gap-6 shadow-2xl z-10 w-[90%] max-w-2xl transition duration-300">
+            <!-- Left Side: Status & Speed Adjustments -->
+            <div class="flex items-center gap-3">
+                <button id="btn-play-pause" class="bg-emerald-500 hover:bg-emerald-400 text-black w-12 h-12 rounded-xl flex items-center justify-center transition active:scale-95 shadow-lg shadow-emerald-500/20" title="Start / Stop Scroll (Space)">
+                    <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="w-6 h-6">
+                        <path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" />
+                    </svg>
+                    <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" fill="currentColor" viewBox="0 0 24 24" class="w-6 h-6 hidden">
+                        <path fill-rule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0A.75.75 0 0115 4.5h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H15a.75.75 0 01-.75-.75V5.25z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+                <button id="btn-reset" class="bg-gray-800 hover:bg-gray-700 text-gray-300 w-12 h-12 rounded-xl flex items-center justify-center transition active:scale-95 border border-gray-700" title="Rewind & Reset Scroll (R)">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-5 h-5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                </button>
+                <div class="h-8 w-px bg-gray-800 mx-1"></div>
+                <!-- Speed Display & Fine-tune adjustments -->
+                <div class="flex items-center gap-1.5">
+                    <button id="btn-speed-down" class="bg-gray-800 hover:bg-gray-700 text-gray-300 w-9 h-9 rounded-lg flex items-center justify-center transition active:scale-95 border border-gray-700" title="Decrease speed (Arrow Down)">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+                        </svg>
+                    </button>
+                    <div class="text-center px-2">
+                        <div class="text-[10px] text-gray-500 font-bold tracking-wider leading-none">SPEED</div>
+                        <div id="float-speed-label" class="text-sm font-mono font-extrabold text-white mt-0.5">3.5</div>
+                    </div>
+                    <button id="btn-speed-up" class="bg-gray-800 hover:bg-gray-700 text-gray-300 w-9 h-9 rounded-lg flex items-center justify-center transition active:scale-95 border border-gray-700" title="Increase speed (Arrow Up)">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Right Side: Mirror indicators, interactive scrolling slider, toggle settings -->
+            <div class="flex items-center gap-4 text-xs font-mono font-semibold">
+                <!-- Visual Scroll Percentage Tracker -->
+                <div class="hidden sm:flex items-center gap-2">
+                    <span class="text-gray-500">POS</span>
+                    <input type="range" id="input-vertical-position" min="0" max="100" value="0" class="w-24 h-1 bg-gray-800 rounded appearance-none cursor-pointer accent-cyan-400">
+                </div>
+                <!-- Mini indicators for mirrors -->
+                <div class="flex items-center gap-1">
+                    <span id="badge-mirror-h" class="bg-gray-950 border border-gray-800 text-gray-600 px-2 py-1 rounded text-[10px] transition-colors duration-200">MIRROR-H</span>
+                    <span id="badge-mirror-v" class="bg-gray-950 border border-gray-800 text-gray-600 px-2 py-1 rounded text-[10px] transition-colors duration-200">MIRROR-V</span>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+</div>
+<div id="mobile-dock" aria-label="Mobile quick controls">
+    <button type="button" data-mobile-action="panel">Controls</button>
+    <button type="button" data-mobile-action="play">Play</button>
+    <button type="button" data-mobile-action="reset">Reset</button>
+    <button type="button" data-mobile-action="fullscreen">Full</button>
+</div>
+
+
+<script>
+const BUILT_IN_PRESETS = {
+    "basalt-engine-alpha": {
+        "title": "Basalt Engine Alpha Stream",
+        "content": "STREAMER:\n\n(Whispering loudly)\n\nYo. Chat. Come here. Seriously, lean in. We need to have a real, unfiltered, family-meeting type of talk today.\n\nIs it just me, or have video games lately... just felt completely, utterly, violently soulless?\n\nLike, I sit here at my desk, looking at a desktop full of icons, looking at a Steam library with hundreds of games, and I feel absolutely nothing. Zero hype.\n\nAnd don't get me wrong! The graphics we are seeing today are objectively mind-blowing. We have real-time ray tracing. We have global illumination. We have photorealistic sweat pores on some guy’s forehead in a sports game.\n\nBut the actual games? The gameplay loops? The actual fun factor?\n\nThey kinda suck right now. They really do.\n\nYeah, I see you guys in chat agreeing.\n\nLet's look at what happened over the last year or two. Every single time a major, multi-million-dollar AAA studio drops a game, what do we get?\n\nWe get a 200-gigabyte download. Two hundred gigabytes!\n\nAnd then you finally finish the download, you boot it up, and boom—Day One Patch. Another 80 gigabytes.\n\nBruh. I just wanted to play a video game!\n\nWhy are we paying seventy dollars—and now sometimes eighty or a hundred dollars for \"early access\"—for games that literally struggle to run at a stable 60 FPS on high-end hardware?\n\nThe engine bloat is real, chat.\n\nAlright folks, this is where it really gets ugly: corporate greed and corporate cowardice.\n\nThe suits in the boardrooms of these massive conglomerate publishers are absolutely petrified of taking risks.\n\nThey don’t see games as art. They don’t even see them as toys or entertainment anymore.\n\nTo them, a game is just a recurring revenue delivery vehicle. It’s a spreadsheet.\n\nIf an idea doesn’t fit into a battle-pass-friendly, skin-selling template, it gets thrown in the trash.\n\nThat is why we get the exact same copy-pasted, open-world map-clearing simulators every single year.\n\nYou climb a tower, you unlock the icons, you clear the outposts, you level up your gear.\n\nIt’s the same psychological Skinner box, wrapped in different skins, designed to milk your wallet dry.\n\nWrite that down: if you cannot afford to fail, you cannot afford to innovate.\n\nBut I didn’t bring you guys here today to just black-pill you.\n\nBecause while the corporate empire is crumbling under its own massive weight, there is a rebellion happening.\n\nAlright folks, for the next part, we have the indie scene.\n\nChat, I am telling you right now: 2026 is officially the Year of the Indie.\n\nWhile these massive AAA companies are burning down, indie studios and solo developers are driving innovation in ways we have literally never seen before.\n\nThey are the ones taking the insane risks, building the weird concepts, and writing the love letters to genres we thought were dead.\n\nIndie developers don't have to answer to shareholders who don't even play video games.\n\nAnd one indie studio leading the charge right now is Iron Will Interactive.\n\nThese guys are absolute mad scientists.\n\nThey are looking at the current state of game technology and saying:\n\n\"Why are we relying on massive, bloated, legacy engines when we could build something custom, fast, and completely revolutionized?\"\n\nAnd speaking of absolute-W indie cooking... I have massive news.\n\nAlright folks, for the next thing we have something that might completely change the game: The Basalt Engine.\n\nIt is currently in early alpha development, but the developer released its very first playable public .exe today.\n\nThe developer goes by the alias Risk.\n\nRisk is not just some random hobbyist who watched a couple Unity tutorials.\n\nHe used to work at Media Molecule, the team behind LittleBigPlanet and Dreams.\n\nHe also created RecipeSmith, the powerful modding framework that unlocked Horizon’s potential.\n\nAnd Risk is currently a core contributor working on the Pulsar Rust engine team.\n\nSo we have a guy with creative tools DNA, serious modding experience, and high-performance Rust engine work behind him.\n\nNow he is putting all of that into his own passion project: The Basalt Engine, under the Iron Will Interactive banner.\n\nThis isn't just a game; it's a statement.\n\nThe Basalt Engine is a custom-built, lightning-fast, ultra-lean runtime built from scratch.\n\nWe are talking about an engine designed for complex animation systems, dynamic physics, and behavioral AI without the massive overhead that plagues modern AAA titles.\n\nAlright chat, no more talking. For the next part, we are actually running this thing.\n\nI downloaded the zip file ten minutes before going live. I haven't even opened it yet.\n\nYou guys are getting my raw first-time reaction.\n\nLet's extract it.\n\nWait... hold on. Look at the file size.\n\nThe entire alpha executable with all its starter assets is forty-two megabytes.\n\nForty-two megabytes!\n\nA modern AAA game needs forty-two megabytes just to render the publisher's copyright notice.\n\nAlright, double-clicking the .exe in three... two... one...\n\nOh! Oh my goodness!\n\nDid you see how fast that booted?\n\nIt didn't show a splash logo. It didn't check for updates. It didn't ask me to sign into anything.\n\nIt just opened instantly.\n\nLook at the movement, chat. Look at how responsive this is. There is zero input lag.\n\nAnd look at the animations.\n\nThe way the hips rotate, the way the feet plant on uneven slopes, the way the weight shifts dynamically based on my input velocity... this is incredibly smooth.\n\nIt’s procedurally blending multiple layers of animation in real time, and it's doing it at hundreds of frames per second.\n\nOh, look at the physics!\n\nNo stuttering. No frame drops. The particle systems are completely fluid.\n\nThis is a pre-alpha, chat.\n\nVersion zero-point-one, released on day one of public visibility, and it already feels more stable and responsive than games that have been in development for seven years by corporate studios.\n\nRisk, you absolute legend, if you are in the chat right now—or if you see this clip later—you are a madman.\n\nThis is pure technical artistry.\n\nLet's see what happens if I spawn one hundred physics objects.\n\nLook at the frame rate! It barely even blinked.\n\nIt dropped from 450 to 420. That is insane.\n\nIn any other commercial engine, spawning this many active colliding physics bodies in an unoptimized build would instantly turn the stream into a slideshow.\n\nBut Basalt is just eating it for breakfast.\n\nAlright folks, to wrap this thing naturally: chat, I don't know about you, but my mind is completely blown.\n\nWe just watched a solo veteran developer drop a forty-two-megabyte executable that boots instantly, runs at over four hundred frames per second, and features some of the most fluid animation blending and physics systems I have seen in years.\n\nThis is the power of the indie scene.\n\nThis is why the corporate giants are terrified.\n\nBecause once players realize they don't have to tolerate bloated, unoptimized, microtransaction-riddled garbage anymore, the game changes.\n\nThe future of gaming is not in the hands of executives sitting in boardrooms.\n\nThe future of gaming is in the hands of rebels.\n\nIt’s in the hands of teams like Iron Will Interactive.\n\nIt’s in developers like Risk who are willing to tear down the old ways and build something better, faster, and more beautiful from the ground up.\n\n2026 is going to be the year that changes everything. Mark my words.\n\nI’m going to put the link to download the Basalt Engine alpha in the chat right now.\n\nGo support Risk, follow the development, leave your feedback, and let him know the stream sent you.\n\nChat, drop a 1 in the chat if you are riding with the indies in 2026.\n\nYes! That's what I'm talking about!\n\nThank you guys so much for hanging out today.\n\nWe are going to keep playing around with this alpha, testing physics configurations, and digging into the developer documentation.\n\nLet's get cooking!"
+    },
+    "tech-keynote": {
+        "title": "⚡ Epic Product Keynote",
+        "content": "Good morning, creators, developers, and visionaries.\n\nToday, we are embarking on a massive technological leaps.\n\nFor years, human-computer interfaces have remained rigid. Locked behind boxes. Locked behind standardized frames.\n\nBut the future demands a far more natural paradigm.\n\nIntroducing the Pro-Crawl Dynamic Projection System.\n\nA real-time, hardware-accelerated broadcast engine designed to fit smoothly into high-intensity filming sessions, keynotes, and live television arrays.\n\nTake a look at the canvas before you. Note the smooth transition rates. Notice how perfectly your eye tracks the center highlight guideline.\n\nWith custom responsive typography, high-contrast matrix schemes, and mirror glass reflection controls, this is the ultimate weapon for professional communicators.\n\nThe stage is yours. The script is set. Break a leg."
+    },
+    "news-anchor": {
+        "title": "🎙️ Breaking News Anchor",
+        "content": "[LIVE TRANSMISSION DETECTED]\n    \nGood evening. This is the Nightline Dispatch with your breaking update.\n\nAstronomers at the Galactic Observatory have just reported a massive, synchronized signal pulsing from the outer rings of the Orion Nebula.\n\nScientists confirm the signal carries an structured mathematical sequence—first discovered during deep space telemetry probes forty years ago.\n\nGovernment officials have gathered at an emergency summit in Geneva to draft a global protocols plan.\n\nAs we receive more details on this historic contact, our ground units will bring you raw footage.\n\nStay locked on this broadcast network as this incredible mystery unfolds.\n\nBack to you in the studio."
+    },
+    "sci-fi-captain": {
+        "title": "🚀 Sci-Fi Commander Brief",
+        "content": "Attention all deck officers and flight personnel.\n\nThis is your Fleet Commander speaking from the tactical command deck.\n\nIn exactly three minutes, the Vanguard Fleet will initiate hyper-jump sequences towards the sector core.\n\nEnsure all localized containment shields are powered to absolute maximum capacity. \n\nOur mission is straightforward, but it carries immense risk: we must bypass the security barriers, establish secure relays, and recover the lost telemetry databanks before the system core collapses.\n\nTrust your flight telemetry. Stay aligned with your squad leaders.\n\nWe have prepared for this journey for years. \n\nMay speed and stellar precision guide our course into the unknown.\n\nCommander out."
+    }
+};
+
+const USER_PRESETS_STORAGE_KEY = 'pro_crawl_user_presets_v1';
+let userPresets = {};
+let editingPresetId = null;
+
+
+// Initial state values
+let state = {
+    isScrolling: false,
+    speed: 3.5,
+    fontFamily: 'font-sans-inter',
+    fontSize: 55,
+    lineHeight: 1.5,
+    trackWidth: 80,
+    backgroundColor: '#050505',
+    textColor: '#ffffff',
+    mirrorH: false,
+    mirrorV: false,
+    showFocusGuide: true,
+    focusOpacity: 20,
+    focusColor: '#10b981',
+    countdownTime: 3,
+    activeTab: 'script',
+    scriptText: BUILT_IN_PRESETS['basalt-engine-alpha'].content,
+    
+    // Engine internals
+    scrollProgress: 0,
+    elapsedSeconds: 0,
+    wordsCount: 0,
+    estMinutes: 0,
+    timerInterval: null,
+    animationFrameId: null,
+    lastFrameTime: null,
+    scrollPosition: 0, // precise floating point scroll coordinate
+    isCountdownActive: false
+};
+
+const dom = {
+    scriptInput: document.getElementById('script-input'),
+    presetSelect: document.getElementById('preset-select'),
+    presetTitleInput: document.getElementById('preset-title-input'),
+    btnSavePreset: document.getElementById('btn-save-preset'),
+    btnNewPreset: document.getElementById('btn-new-preset'),
+    presetCardList: document.getElementById('preset-card-list'),
+    tabScriptBtn: document.getElementById('tab-script-btn'),
+    tabConfigBtn: document.getElementById('tab-config-btn'),
+    tabScript: document.getElementById('tab-script'),
+    tabConfig: document.getElementById('tab-config'),
+    
+    controlPanel: document.getElementById('control-panel'),
+    btnTogglePanel: document.getElementById('btn-toggle-panel'),
+    panelBtnText: document.getElementById('panel-btn-text'),
+    
+    inputSpeed: document.getElementById('input-speed'),
+    valSpeed: document.getElementById('val-speed'),
+    floatSpeedLabel: document.getElementById('float-speed-label'),
+    btnSpeedDown: document.getElementById('btn-speed-down'),
+    btnSpeedUp: document.getElementById('btn-speed-up'),
+    
+    inputCountdown: document.getElementById('input-countdown'),
+    valCountdown: document.getElementById('val-countdown'),
+    
+    selectFont: document.getElementById('select-font'),
+    inputFontSize: document.getElementById('input-fontsize'),
+    valFontSize: document.getElementById('val-fontsize'),
+    inputLineHeight: document.getElementById('input-lineheight'),
+    valLineHeight: document.getElementById('val-lineheight'),
+    inputTrackWidth: document.getElementById('input-trackwidth'),
+    valTrackWidth: document.getElementById('val-trackwidth'),
+    
+    colorBg: document.getElementById('color-bg'),
+    lblColorBg: document.getElementById('lbl-color-bg'),
+    colorText: document.getElementById('color-text'),
+    lblColorText: document.getElementById('lbl-color-text'),
+    colorPresetBtns: document.querySelectorAll('.color-preset-btn'),
+    
+    btnMirrorH: document.getElementById('btn-mirror-h'),
+    btnMirrorV: document.getElementById('btn-mirror-v'),
+    badgeMirrorH: document.getElementById('badge-mirror-h'),
+    badgeMirrorV: document.getElementById('badge-mirror-v'),
+    
+    toggleFocusBar: document.getElementById('toggle-focus-bar'),
+    focusBarControls: document.getElementById('focus-bar-controls'),
+    inputFocusOpacity: document.getElementById('input-focus-opacity'),
+    valFocusOpacity: document.getElementById('val-focus-opacity'),
+    colorFocusBar: document.getElementById('color-focus-bar'),
+    
+    prompterViewport: document.getElementById('prompter-viewport'),
+    prompterScrollArea: document.getElementById('prompter-scroll-area'),
+    focusIndicatorBand: document.getElementById('focus-indicator-band'),
+    guideBracketL: document.getElementById('guide-bracket-l'),
+    guideBracketR: document.getElementById('guide-bracket-r'),
+    prompterTextContainer: document.getElementById('prompter-text-container'),
+    
+    btnPlayPause: document.getElementById('btn-play-pause'),
+    iconPlay: document.getElementById('icon-play'),
+    iconPause: document.getElementById('icon-pause'),
+    btnReset: document.getElementById('btn-reset'),
+    inputVerticalPosition: document.getElementById('input-vertical-position'),
+    btnFullscreen: document.getElementById('btn-fullscreen'),
+    
+    countdownOverlay: document.getElementById('countdown-overlay'),
+    countdownNumber: document.getElementById('countdown-number'),
+    btnCancelCountdown: document.getElementById('btn-cancel-countdown'),
+    
+    statWordcount: document.getElementById('stat-wordcount'),
+    statEsttime: document.getElementById('stat-esttime'),
+    statElapsed: document.getElementById('stat-elapsed'),
+    statProgress: document.getElementById('stat-progress'),
+    statusText: document.getElementById('status-text'),
+    statusIndicatorDot: document.getElementById('status-indicator-dot')
+};
+
+function initializeApp() {
+    loadUserPresets();
+    renderPresetLibrary();
+
+    // Check local storage for saved script, otherwise use default
+    const savedScript = localStorage.getItem('pro_crawl_script');
+    if (savedScript) {
+        state.scriptText = savedScript;
+    }
+    
+    dom.scriptInput.value = state.scriptText;
+    updatePrompterContent();
+    updateStatistics();
+    
+    // Apply initial state styling
+    applyTypographyStyles();
+    applyColorPalette();
+    applyMirrorTransforms();
+    updateFocusGuideVisuals();
+    
+    // Sync UI components to current state values
+    syncUIControls();
+}
+
+function syncUIControls() {
+    dom.inputSpeed.value = state.speed;
+    dom.valSpeed.innerText = state.speed.toFixed(1);
+    dom.floatSpeedLabel.innerText = state.speed.toFixed(1);
+    
+    dom.inputCountdown.value = state.countdownTime;
+    dom.valCountdown.innerText = state.countdownTime + 's';
+    
+    dom.selectFont.value = state.fontFamily;
+    dom.inputFontSize.value = state.fontSize;
+    dom.valFontSize.innerText = state.fontSize + 'px';
+    dom.inputLineHeight.value = state.lineHeight;
+    dom.valLineHeight.innerText = state.lineHeight + 'x';
+    dom.inputTrackWidth.value = state.trackWidth;
+    dom.valTrackWidth.innerText = state.trackWidth + '%';
+    
+    dom.colorBg.value = state.backgroundColor;
+    dom.lblColorBg.innerText = state.backgroundColor;
+    dom.colorText.value = state.textColor;
+    dom.lblColorText.innerText = state.textColor;
+    
+    dom.toggleFocusBar.checked = state.showFocusGuide;
+    dom.inputFocusOpacity.value = state.focusOpacity;
+    dom.valFocusOpacity.innerText = state.focusOpacity + '%';
+    dom.colorFocusBar.value = state.focusColor;
+}
+
+dom.tabScriptBtn.addEventListener('click', () => {
+    state.activeTab = 'script';
+    dom.tabScriptBtn.classList.add('border-emerald-500', 'text-emerald-400');
+    dom.tabScriptBtn.classList.remove('border-transparent', 'text-gray-400');
+    dom.tabConfigBtn.classList.add('border-transparent', 'text-gray-400');
+    dom.tabConfigBtn.classList.remove('border-emerald-500', 'text-emerald-400');
+    
+    dom.tabScript.classList.remove('hidden');
+    dom.tabConfig.classList.add('hidden');
+});
+
+dom.tabConfigBtn.addEventListener('click', () => {
+    state.activeTab = 'config';
+    dom.tabConfigBtn.classList.add('border-emerald-500', 'text-emerald-400');
+    dom.tabConfigBtn.classList.remove('border-transparent', 'text-gray-400');
+    dom.tabScriptBtn.classList.add('border-transparent', 'text-gray-400');
+    dom.tabScriptBtn.classList.remove('border-emerald-500', 'text-emerald-400');
+    
+    dom.tabConfig.classList.remove('hidden');
+    dom.tabScript.classList.add('hidden');
+});
+
+// Toggle Sidebar Panel visibility
+dom.btnTogglePanel.addEventListener('click', () => {
+    if (dom.controlPanel.classList.contains('w-96')) {
+        dom.controlPanel.classList.remove('w-96');
+        dom.controlPanel.classList.add('w-0', 'border-r-0');
+        dom.panelBtnText.innerText = 'SHOW CONTROLS';
+    } else {
+        dom.controlPanel.classList.remove('w-0', 'border-r-0');
+        dom.controlPanel.classList.add('w-96');
+        dom.panelBtnText.innerText = 'HIDE CONTROLS';
+    }
+});
+
+function updatePrompterContent() {
+    // Insert text safely. We escape HTML to prevent exploits, but parse linebreaks
+    const cleanText = dom.scriptInput.value
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    
+    dom.prompterTextContainer.innerHTML = cleanText;
+    state.scriptText = dom.scriptInput.value;
+    localStorage.setItem('pro_crawl_script', state.scriptText);
+    updateStatistics();
+}
+
+dom.scriptInput.addEventListener('input', updatePrompterContent);
+
+function getAllPresets() {
+    return {
+        ...Object.fromEntries(Object.entries(BUILT_IN_PRESETS).map(([id, preset]) => [id, { ...preset, source: 'built-in' }])),
+        ...Object.fromEntries(Object.entries(userPresets).map(([id, preset]) => [id, { ...preset, source: 'saved' }]))
+    };
+}
+
+function loadUserPresets() {
+    try {
+        const raw = localStorage.getItem(USER_PRESETS_STORAGE_KEY);
+        userPresets = raw ? JSON.parse(raw) : {};
+    } catch (error) {
+        console.warn('Preset storage was corrupted. Resetting saved presets.', error);
+        userPresets = {};
+        localStorage.removeItem(USER_PRESETS_STORAGE_KEY);
+    }
+}
+
+function saveUserPresets() {
+    localStorage.setItem(USER_PRESETS_STORAGE_KEY, JSON.stringify(userPresets));
+}
+
+function makePresetId(title) {
+    const base = title
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '') || 'untitled-preset';
+
+    let id = `user-${base}`;
+    let count = 2;
+    while (userPresets[id] || BUILT_IN_PRESETS[id]) {
+        id = `user-${base}-${count++}`;
+    }
+    return id;
+}
+
+function renderPresetLibrary() {
+    const allPresets = getAllPresets();
+
+    dom.presetSelect.innerHTML = '<option value="">-- Load Preset --</option>';
+    Object.entries(allPresets).forEach(([id, preset]) => {
+        const option = document.createElement('option');
+        option.value = id;
+        option.textContent = preset.source === 'built-in' ? preset.title : `💾 ${preset.title}`;
+        dom.presetSelect.appendChild(option);
+    });
+
+    dom.presetCardList.innerHTML = '';
+
+    Object.entries(allPresets).forEach(([id, preset]) => {
+        const words = preset.content.trim() ? preset.content.trim().split(/\s+/).length : 0;
+        const card = document.createElement('div');
+        card.className = 'bg-gray-900 border border-gray-800 rounded-xl p-3 flex flex-col gap-2';
+
+        const top = document.createElement('div');
+        top.className = 'flex items-start justify-between gap-2';
+
+        const info = document.createElement('div');
+        info.className = 'min-w-0';
+
+        const title = document.createElement('div');
+        title.className = 'text-xs font-extrabold text-gray-100 truncate';
+        title.textContent = preset.title;
+
+        const meta = document.createElement('div');
+        meta.className = 'text-[10px] font-mono text-gray-500 mt-0.5';
+        meta.textContent = `${preset.source.toUpperCase()} • ${words} WORDS`;
+
+        info.appendChild(title);
+        info.appendChild(meta);
+
+        const actions = document.createElement('div');
+        actions.className = 'flex gap-1 shrink-0';
+
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 rounded-md px-2 py-1 text-[10px] font-bold transition';
+        loadBtn.textContent = 'LOAD';
+        loadBtn.addEventListener('click', () => loadPreset(id));
+
+        const editBtn = document.createElement('button');
+        editBtn.className = 'bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 rounded-md px-2 py-1 text-[10px] font-bold transition';
+        editBtn.textContent = preset.source === 'built-in' ? 'COPY' : 'EDIT';
+        editBtn.addEventListener('click', () => beginEditPreset(id));
+
+        actions.appendChild(loadBtn);
+        actions.appendChild(editBtn);
+
+        if (preset.source === 'saved') {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'bg-red-500/10 hover:bg-red-500/20 border border-red-500/40 text-red-300 rounded-md px-2 py-1 text-[10px] font-bold transition';
+            deleteBtn.textContent = 'DEL';
+            deleteBtn.addEventListener('click', () => deletePreset(id));
+            actions.appendChild(deleteBtn);
+        }
+
+        top.appendChild(info);
+        top.appendChild(actions);
+
+        const preview = document.createElement('p');
+        preview.className = 'text-[10px] text-gray-500 leading-snug line-clamp-2';
+        preview.textContent = preset.content.replace(/\s+/g, ' ').trim().slice(0, 180) || 'Empty preset';
+
+        card.appendChild(top);
+        card.appendChild(preview);
+        dom.presetCardList.appendChild(card);
+    });
+}
+
+function loadPreset(id) {
+    const preset = getAllPresets()[id];
+    if (!preset) return;
+
+    dom.scriptInput.value = preset.content;
+    updatePrompterContent();
+    dom.presetSelect.value = '';
+    showBriefStatus('Loaded preset!');
+}
+
+function beginEditPreset(id) {
+    const allPresets = getAllPresets();
+    const preset = allPresets[id];
+    if (!preset) return;
+
+    dom.presetTitleInput.value = preset.source === 'built-in' ? `${preset.title} Copy` : preset.title;
+    dom.scriptInput.value = preset.content;
+    updatePrompterContent();
+
+    editingPresetId = preset.source === 'saved' ? id : null;
+    dom.btnSavePreset.textContent = preset.source === 'saved' ? 'UPDATE' : 'SAVE';
+    showBriefStatus(preset.source === 'saved' ? 'Editing preset!' : 'Copied preset!');
+}
+
+function clearPresetEditor() {
+    editingPresetId = null;
+    dom.presetTitleInput.value = '';
+    dom.btnSavePreset.textContent = 'SAVE';
+    dom.presetTitleInput.focus();
+}
+
+function saveCurrentPreset() {
+    const title = dom.presetTitleInput.value.trim();
+    const content = dom.scriptInput.value;
+
+    if (!title) {
+        showBriefStatus('Add a title first!');
+        return;
+    }
+
+    if (!content.trim()) {
+        showBriefStatus('Script is empty!');
+        return;
+    }
+
+    const id = editingPresetId && userPresets[editingPresetId] ? editingPresetId : makePresetId(title);
+    userPresets[id] = {
+        title,
+        content,
+        updatedAt: new Date().toISOString()
+    };
+
+    saveUserPresets();
+    renderPresetLibrary();
+    editingPresetId = id;
+    dom.btnSavePreset.textContent = 'UPDATE';
+    showBriefStatus('Preset saved!');
+}
+
+function deletePreset(id) {
+    if (!userPresets[id]) return;
+
+    const presetTitle = userPresets[id].title;
+    const ok = confirm(`Delete saved preset "${presetTitle}"?`);
+    if (!ok) return;
+
+    delete userPresets[id];
+    if (editingPresetId === id) clearPresetEditor();
+
+    saveUserPresets();
+    renderPresetLibrary();
+    showBriefStatus('Preset deleted!');
+}
+
+dom.btnSavePreset.addEventListener('click', saveCurrentPreset);
+dom.btnNewPreset.addEventListener('click', clearPresetEditor);
+
+dom.presetSelect.addEventListener('change', (e) => {
+    const selected = e.target.value;
+    if (selected) loadPreset(selected);
+});
+
+function updateStatistics() {
+    const text = dom.scriptInput.value.trim();
+    const words = text ? text.split(/\s+/).length : 0;
+    state.wordsCount = words;
+    dom.statWordcount.innerText = words;
+    
+    // Normal reading rate is roughly 140 words per minute (WPM)
+    const totalMinutes = words / 140;
+    const totalSeconds = Math.round(totalMinutes * 60);
+    const estMin = Math.floor(totalSeconds / 60);
+    const estSec = totalSeconds % 60;
+    
+    dom.statEsttime.innerText = `${String(estMin).padStart(2, '0')}:${String(estSec).padStart(2, '0')}`;
+}
+
+function updateLiveScrollPercentage() {
+    const scrollHeight = dom.prompterScrollArea.scrollHeight - dom.prompterScrollArea.clientHeight;
+    if (scrollHeight <= 0) {
+        state.scrollProgress = 0;
+    } else {
+        state.scrollProgress = Math.round((dom.prompterScrollArea.scrollTop / scrollHeight) * 100);
+    }
+    dom.statProgress.innerText = state.scrollProgress + '%';
+    dom.inputVerticalPosition.value = state.scrollProgress;
+}
+
+// Support manual positioning drag via progress slider in HUD bar
+dom.inputVerticalPosition.addEventListener('input', (e) => {
+    const val = parseFloat(e.target.value) / 100;
+    const scrollHeight = dom.prompterScrollArea.scrollHeight - dom.prompterScrollArea.clientHeight;
+    dom.prompterScrollArea.scrollTop = scrollHeight * val;
+    state.scrollPosition = dom.prompterScrollArea.scrollTop;
+    updateLiveScrollPercentage();
+});
+
+function startTimer() {
+    if (state.timerInterval) clearInterval(state.timerInterval);
+    state.timerInterval = setInterval(() => {
+        state.elapsedSeconds++;
+        const mins = Math.floor(state.elapsedSeconds / 60);
+        const secs = state.elapsedSeconds % 60;
+        dom.statElapsed.innerText = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+    }, 1000);
+}
+
+function stopTimer() {
+    if (state.timerInterval) {
+        clearInterval(state.timerInterval);
+        state.timerInterval = null;
+    }
+}
+
+function resetTimer() {
+    stopTimer();
+    state.elapsedSeconds = 0;
+    dom.statElapsed.innerText = "00:00";
+}
+
+function applyTypographyStyles() {
+    // Clear old classes
+    dom.prompterTextContainer.className = 'w-[80%] mx-auto font-sans-inter text-white font-semibold whitespace-pre-line text-center transition-all duration-300 origin-center select-none';
+    
+    // Clean old font families
+    dom.prompterTextContainer.classList.remove('font-sans-inter', 'font-sans-lexend', 'font-serif-playfair', 'font-mono-courier', 'font-tech-space');
+    dom.prompterTextContainer.classList.add(state.fontFamily);
+    
+    dom.prompterTextContainer.style.fontSize = `${state.fontSize}px`;
+    dom.prompterTextContainer.style.lineHeight = state.lineHeight;
+    dom.prompterTextContainer.style.width = `${state.trackWidth}%`;
+}
+
+// Typographic DOM listener triggers
+dom.selectFont.addEventListener('change', (e) => {
+    state.fontFamily = e.target.value;
+    applyTypographyStyles();
+});
+
+dom.inputFontSize.addEventListener('input', (e) => {
+    state.fontSize = parseInt(e.target.value);
+    dom.valFontSize.innerText = state.fontSize + 'px';
+    applyTypographyStyles();
+});
+
+dom.inputLineHeight.addEventListener('input', (e) => {
+    state.lineHeight = parseFloat(e.target.value);
+    dom.valLineHeight.innerText = state.lineHeight + 'x';
+    applyTypographyStyles();
+});
+
+dom.inputTrackWidth.addEventListener('input', (e) => {
+    state.trackWidth = parseInt(e.target.value);
+    dom.valTrackWidth.innerText = state.trackWidth + '%';
+    applyTypographyStyles();
+});
+
+function applyColorPalette() {
+    // Body colors
+    dom.prompterViewport.style.backgroundColor = state.backgroundColor;
+    dom.prompterScrollArea.style.backgroundColor = state.backgroundColor;
+    dom.prompterTextContainer.style.color = state.textColor;
+}
+
+// Trigger change listeners
+dom.colorBg.addEventListener('input', (e) => {
+    state.backgroundColor = e.target.value;
+    dom.lblColorBg.innerText = state.backgroundColor;
+    applyColorPalette();
+});
+
+dom.colorText.addEventListener('input', (e) => {
+    state.textColor = e.target.value;
+    dom.lblColorText.innerText = state.textColor;
+    applyColorPalette();
+});
+
+// Color preset listeners
+dom.colorPresetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        const bgVal = btn.getAttribute('data-bg');
+        const textVal = btn.getAttribute('data-text');
+        
+        state.backgroundColor = bgVal;
+        state.textColor = textVal;
+        
+        dom.colorBg.value = bgVal;
+        dom.lblColorBg.innerText = bgVal;
+        
+        dom.colorText.value = textVal;
+        dom.lblColorText.innerText = textVal;
+        
+        applyColorPalette();
+    });
+});
+
+function applyMirrorTransforms() {
+    // Clear dynamic class
+    dom.prompterTextContainer.classList.remove('mirror-horizontal', 'mirror-vertical', 'mirror-both');
+    
+    if (state.mirrorH && state.mirrorV) {
+        dom.prompterTextContainer.classList.add('mirror-both');
+    } else if (state.mirrorH) {
+        dom.prompterTextContainer.classList.add('mirror-horizontal');
+    } else if (state.mirrorV) {
+        dom.prompterTextContainer.classList.add('mirror-vertical');
+    }
+    
+    // Style badges
+    if (state.mirrorH) {
+        dom.badgeMirrorH.classList.add('text-emerald-400', 'border-emerald-500/50', 'bg-emerald-500/10');
+        dom.badgeMirrorH.classList.remove('text-gray-600', 'border-gray-800', 'bg-gray-950');
+        dom.btnMirrorH.classList.add('border-emerald-500', 'text-emerald-400', 'bg-emerald-500/10');
+    } else {
+        dom.badgeMirrorH.classList.add('text-gray-600', 'border-gray-800', 'bg-gray-950');
+        dom.badgeMirrorH.classList.remove('text-emerald-400', 'border-emerald-500/50', 'bg-emerald-500/10');
+        dom.btnMirrorH.classList.remove('border-emerald-500', 'text-emerald-400', 'bg-emerald-500/10');
+    }
+    
+    if (state.mirrorV) {
+        dom.badgeMirrorV.classList.add('text-emerald-400', 'border-emerald-500/50', 'bg-emerald-500/10');
+        dom.badgeMirrorV.classList.remove('text-gray-600', 'border-gray-800', 'bg-gray-950');
+        dom.btnMirrorV.classList.add('border-emerald-500', 'text-emerald-400', 'bg-emerald-500/10');
+    } else {
+        dom.badgeMirrorV.classList.add('text-gray-600', 'border-gray-800', 'bg-gray-950');
+        dom.badgeMirrorV.classList.remove('text-emerald-400', 'border-emerald-500/50', 'bg-emerald-500/10');
+        dom.btnMirrorV.classList.remove('border-emerald-500', 'text-emerald-400', 'bg-emerald-500/10');
+    }
+}
+
+dom.btnMirrorH.addEventListener('click', () => {
+    state.mirrorH = !state.mirrorH;
+    applyMirrorTransforms();
+});
+
+dom.btnMirrorV.addEventListener('click', () => {
+    state.mirrorV = !state.mirrorV;
+    applyMirrorTransforms();
+});
+
+// Update Focus Guideline visuals
+function updateFocusGuideVisuals() {
+    if (state.showFocusGuide) {
+        dom.focusIndicatorBand.classList.remove('opacity-0');
+        dom.focusBarControls.classList.remove('opacity-40', 'pointer-events-none');
+        
+        // Form hex to RGBA for focus shade band
+        const opacityRatio = state.focusOpacity / 100;
+        const rgb = hexToRgb(state.focusColor);
+        if (rgb) {
+            dom.focusIndicatorBand.style.backgroundColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacityRatio})`;
+            dom.guideBracketL.style.borderColor = state.focusColor;
+            dom.guideBracketR.style.borderColor = state.focusColor;
+        }
+    } else {
+        dom.focusIndicatorBand.classList.add('opacity-0');
+        dom.focusBarControls.classList.add('opacity-40', 'pointer-events-none');
+    }
+}
+
+// Hex color to RGB object utility
+function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+        r: parseInt(result[1], 16),
+        g: parseInt(result[2], 16),
+        b: parseInt(result[3], 16)
+    } : null;
+}
+
+dom.toggleFocusBar.addEventListener('change', (e) => {
+    state.showFocusGuide = e.target.checked;
+    updateFocusGuideVisuals();
+});
+
+dom.inputFocusOpacity.addEventListener('input', (e) => {
+    state.focusOpacity = parseInt(e.target.value);
+    dom.valFocusOpacity.innerText = state.focusOpacity + '%';
+    updateFocusGuideVisuals();
+});
+
+dom.colorFocusBar.addEventListener('input', (e) => {
+    state.focusColor = e.target.value;
+    updateFocusGuideVisuals();
+});
+
+function startScrolling() {
+    if (state.isScrolling) return;
+    state.isScrolling = true;
+    
+    // Adjust Play buttons
+    dom.iconPlay.classList.add('hidden');
+    dom.iconPause.classList.remove('hidden');
+    dom.btnPlayPause.classList.remove('bg-emerald-500', 'hover:bg-emerald-400');
+    dom.btnPlayPause.classList.add('bg-amber-500', 'hover:bg-amber-400');
+    
+    // Status text updates
+    dom.statusText.innerText = 'STATUS: ACTIVE';
+    dom.statusText.classList.remove('text-gray-400', 'border-gray-700');
+    dom.statusText.classList.add('text-emerald-400', 'border-emerald-500/40');
+    dom.statusIndicatorDot.classList.remove('bg-emerald-500');
+    dom.statusIndicatorDot.classList.add('bg-red-500');
+    
+    state.lastFrameTime = performance.now();
+    state.scrollPosition = dom.prompterScrollArea.scrollTop;
+    
+    // Begin continuous requestAnimationFrame
+    state.animationFrameId = requestAnimationFrame(scrollUpdateLoop);
+    startTimer();
+}
+
+function stopScrolling() {
+    if (!state.isScrolling) return;
+    state.isScrolling = false;
+    
+    // Adjust Pause buttons
+    dom.iconPlay.classList.remove('hidden');
+    dom.iconPause.classList.add('hidden');
+    dom.btnPlayPause.classList.add('bg-emerald-500', 'hover:bg-emerald-400');
+    dom.btnPlayPause.classList.remove('bg-amber-500', 'hover:bg-amber-400');
+    
+    // Status text updates
+    dom.statusText.innerText = 'STATUS: PAUSED';
+    dom.statusText.classList.add('text-gray-400', 'border-gray-700');
+    dom.statusText.classList.remove('text-emerald-400', 'border-emerald-500/40');
+    dom.statusIndicatorDot.classList.add('bg-emerald-500');
+    dom.statusIndicatorDot.classList.remove('bg-red-500');
+    
+    if (state.animationFrameId) {
+        cancelAnimationFrame(state.animationFrameId);
+        state.animationFrameId = null;
+    }
+    stopTimer();
+}
+
+function scrollUpdateLoop(timestamp) {
+    if (!state.isScrolling) return;
+    
+    const elapsed = timestamp - state.lastFrameTime;
+    state.lastFrameTime = timestamp;
+    
+    // Calculate the pixels to scroll based on time elapsed & speed
+    // Speed factor: scale logically so higher speeds feel great. At speed 1, we do roughly 15 pixels/second
+    const pixelsPerSec = state.speed * 20;
+    const increment = (pixelsPerSec * elapsed) / 1000;
+    
+    state.scrollPosition += increment;
+    dom.prompterScrollArea.scrollTop = Math.floor(state.scrollPosition);
+    
+    // Update progress tracker
+    updateLiveScrollPercentage();
+    
+    // Check if we hit the bottom boundary
+    const maxScroll = dom.prompterScrollArea.scrollHeight - dom.prompterScrollArea.clientHeight;
+    if (state.scrollPosition >= maxScroll && maxScroll > 0) {
+        stopScrolling();
+        showBriefStatus('Script Finished!');
+    } else {
+        state.animationFrameId = requestAnimationFrame(scrollUpdateLoop);
+    }
+}
+
+// Live monitoring scroll tracking if user manually scrolls with mouse wheel
+dom.prompterScrollArea.addEventListener('scroll', () => {
+    // If not currently executing inside loop, update local precise position index to sync
+    if (!state.isScrolling) {
+        state.scrollPosition = dom.prompterScrollArea.scrollTop;
+        updateLiveScrollPercentage();
+    }
+});
+
+function togglePlayPause() {
+    if (state.isScrolling) {
+        stopScrolling();
+    } else {
+        if (state.countdownTime > 0 && dom.prompterScrollArea.scrollTop === 0) {
+            triggerCountdownSequence();
+        } else {
+            startScrolling();
+        }
+    }
+}
+
+function triggerCountdownSequence() {
+    if (state.isCountdownActive) return;
+    state.isCountdownActive = true;
+    
+    // Clear and prepare overlay
+    dom.countdownOverlay.classList.remove('pointer-events-none', 'opacity-0');
+    dom.countdownOverlay.classList.add('opacity-100');
+    
+    let secondsLeft = state.countdownTime;
+    dom.countdownNumber.innerText = secondsLeft;
+    
+    const countInterval = setInterval(() => {
+        secondsLeft--;
+        if (secondsLeft <= 0) {
+            clearInterval(countInterval);
+            dom.countdownOverlay.classList.remove('opacity-100');
+            dom.countdownOverlay.classList.add('opacity-0', 'pointer-events-none');
+            state.isCountdownActive = false;
+            startScrolling();
+        } else {
+            dom.countdownNumber.innerText = secondsLeft;
+        }
+    }, 1000);
+    
+    // Allow cancellation
+    dom.btnCancelCountdown.onclick = () => {
+        clearInterval(countInterval);
+        dom.countdownOverlay.classList.remove('opacity-100');
+        dom.countdownOverlay.classList.add('opacity-0', 'pointer-events-none');
+        state.isCountdownActive = false;
+    };
+}
+
+// Reset scroll triggers
+function resetPrompterScroll() {
+    stopScrolling();
+    resetTimer();
+    dom.prompterScrollArea.scrollTop = 0;
+    state.scrollPosition = 0;
+    updateLiveScrollPercentage();
+    showBriefStatus('Script Reset!');
+}
+
+// Speed change trigger
+function changeSpeed(newSpeed) {
+    state.speed = Math.max(0, Math.min(15, newSpeed));
+    dom.inputSpeed.value = state.speed;
+    dom.valSpeed.innerText = state.speed.toFixed(1);
+    dom.floatSpeedLabel.innerText = state.speed.toFixed(1);
+}
+
+dom.inputSpeed.addEventListener('input', (e) => {
+    changeSpeed(parseFloat(e.target.value));
+});
+
+dom.inputCountdown.addEventListener('input', (e) => {
+    state.countdownTime = parseInt(e.target.value);
+    dom.valCountdown.innerText = state.countdownTime + 's';
+});
+
+dom.btnSpeedDown.addEventListener('click', () => {
+    changeSpeed(state.speed - 0.5);
+});
+
+dom.btnSpeedUp.addEventListener('click', () => {
+    changeSpeed(state.speed + 0.5);
+});
+
+dom.btnPlayPause.addEventListener('click', togglePlayPause);
+dom.btnReset.addEventListener('click', resetPrompterScroll);
+
+window.addEventListener('keydown', (e) => {
+    // If user is focused inside text editor textarea, do not capture hotkeys
+    if (document.activeElement === dom.scriptInput) {
+        return;
+    }
+    
+    const key = e.key.toLowerCase();
+    
+    if (e.code === 'Space' || key === ' ') {
+        e.preventDefault();
+        togglePlayPause();
+    } else if (key === 'arrowup') {
+        e.preventDefault();
+        changeSpeed(state.speed + 0.5);
+    } else if (key === 'arrowdown') {
+        e.preventDefault();
+        changeSpeed(state.speed - 0.5);
+    } else if (key === 'r') {
+        e.preventDefault();
+        resetPrompterScroll();
+    } else if (key === 'f') {
+        e.preventDefault();
+        toggleFullscreen();
+    } else if (key === 'm') {
+        e.preventDefault();
+        state.mirrorH = !state.mirrorH;
+        applyMirrorTransforms();
+    }
+});
+
+function toggleFullscreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            console.error(`Error enabling fullscreen: ${err.message}`);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+dom.btnFullscreen.addEventListener('click', toggleFullscreen);
+
+// Monitor browser fullscreen event to update aesthetic styles
+document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) {
+        dom.btnFullscreen.classList.add('bg-emerald-600', 'text-black');
+    } else {
+        dom.btnFullscreen.classList.remove('bg-emerald-600', 'text-black');
+    }
+});
+
+// Little overlay Status popup bubble utility
+function showBriefStatus(message) {
+    const existing = document.getElementById('toast-notification');
+    if (existing) existing.remove();
+    
+    const toast = document.createElement('div');
+    toast.id = 'toast-notification';
+    toast.className = 'absolute bottom-24 left-1/2 -translate-x-1/2 bg-emerald-500 text-black py-2 px-5 rounded-full font-bold text-xs tracking-wider shadow-xl z-50 transition-all duration-300 pointer-events-none opacity-0';
+    toast.innerText = message.toUpperCase();
+    
+    document.body.appendChild(toast);
+    
+    // Quick micro animation delay
+    setTimeout(() => {
+        toast.classList.remove('opacity-0');
+        toast.classList.add('opacity-100');
+    }, 10);
+    
+    // Slide out
+    setTimeout(() => {
+        toast.classList.remove('opacity-100');
+        toast.classList.add('opacity-0');
+        setTimeout(() => toast.remove(), 300);
+    }, 1800);
+}
+
+
+function installMobileTouchControls() {
+    const dock = document.getElementById('mobile-dock');
+    if (!dock) return;
+
+    dock.addEventListener('click', (event) => {
+        const button = event.target.closest('[data-mobile-action]');
+        if (!button) return;
+
+        const action = button.getAttribute('data-mobile-action');
+        if (action === 'panel') {
+            dom.btnTogglePanel.click();
+        } else if (action === 'play') {
+            togglePlayPause();
+        } else if (action === 'reset') {
+            resetPrompterScroll();
+        } else if (action === 'fullscreen') {
+            toggleFullscreen();
+        }
+    });
+
+    let lastTouchY = null;
+    dom.prompterScrollArea.addEventListener('touchstart', (event) => {
+        if (!event.touches.length) return;
+        lastTouchY = event.touches[0].clientY;
+    }, { passive: true });
+
+    dom.prompterScrollArea.addEventListener('touchmove', (event) => {
+        if (!event.touches.length || lastTouchY === null || state.isScrolling) return;
+        const currentY = event.touches[0].clientY;
+        const delta = lastTouchY - currentY;
+        dom.prompterScrollArea.scrollTop += delta;
+        state.scrollPosition = dom.prompterScrollArea.scrollTop;
+        lastTouchY = currentY;
+        updateLiveScrollPercentage();
+    }, { passive: true });
+}
+
+// Run Core Loader on screen ready
+window.onload = function() {
+    initializeApp();
+    installMobileTouchControls();
+};
+</script>
+</body>
+</html>

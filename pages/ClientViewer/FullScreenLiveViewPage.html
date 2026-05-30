@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Demo generated static viewer client."><meta name="theme-color" content="#9146ff"><title>Generated Viewer Demo</title><style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#000;color:#eaffff;font-family:Segoe UI,Arial,sans-serif;overflow:hidden}.app{position:fixed;inset:0}.stream{position:absolute;inset:0;width:100%;height:100%;border:0}.actions{position:absolute;right:16px;top:16px;z-index:5;display:flex;gap:8px;flex-wrap:wrap}button,a{border:1px solid rgba(0,255,213,.35);background:rgba(18,18,34,.88);color:#eaffff;border-radius:14px;padding:10px 12px;font-size:12px;font-weight:900;text-decoration:none;cursor:pointer}.chat{position:absolute;top:0;right:0;width:min(420px,90vw);height:100%;z-index:4;background:#0e0e1a;border-left:1px solid #31314f;transition:.25s}.chat.closed{transform:translateX(100%);opacity:0}.chat iframe,.metrics iframe{width:100%;height:100%;border:0}.metrics{position:absolute;right:18px;bottom:18px;width:min(760px,calc(100vw - 36px));height:min(560px,calc(100vh - 120px));z-index:6;background:#05050a;border:1px solid rgba(0,255,213,.35);border-radius:18px;overflow:hidden;display:none}.metrics.open{display:block}.metricsHead{height:42px;background:#121222;border-bottom:1px solid #31314f;display:flex;align-items:center;justify-content:space-between;padding:0 10px;font-size:12px;font-weight:900}.metrics iframe{height:calc(100% - 42px)}</style></head><body><div class="app"><iframe id="stream" class="stream" allowfullscreen allow="autoplay; fullscreen"></iframe><div class="actions"><button id="metricsBtn">Dashboard Metrics</button><button id="chatBtn">Toggle Chat</button></div><aside id="chat" class="chat"><iframe id="chatFrame"></iframe></aside><section id="metrics" class="metrics"><div class="metricsHead"><span id="metricsLabel">TWITCHTRACKER / technoconqueror</span><button id="closeMetrics">Close</button></div><iframe id="metricsFrame"></iframe></section></div><script>
+const params=new URLSearchParams(location.search);
+const platform=(params.get('platform')||localStorage.getItem('selectedStreamPlatform')||'twitch').toLowerCase()==='youtube'?'youtube':'twitch';
+const parent=location.hostname||'localhost';
+function cleanTwitch(v){return String(v||'technoconqueror').trim().toLowerCase().replace(/^https?:\/\/(www\.)?twitch\.tv\//i,'').split(/[/?#]/)[0].replace(/[^a-z0-9_]/g,'')||'technoconqueror'}
+function parseYt(v){const raw=String(v||'zJwMfRgk3OE').trim();for(const p of [/[?&]v=([A-Za-z0-9_-]{6,})/,/youtu\.be\/([A-Za-z0-9_-]{6,})/,/\/embed\/([A-Za-z0-9_-]{6,})/,/\/live\/([A-Za-z0-9_-]{6,})/,/\/shorts\/([A-Za-z0-9_-]{6,})/]){const m=raw.match(p);if(m)return m[1];}return raw.replace(/[^A-Za-z0-9_-]/g,'')||'zJwMfRgk3OE'}
+const source=params.get('channel')||params.get('video')||(platform==='youtube'?localStorage.getItem('selectedYouTubeSource'):localStorage.getItem('selectedTwitchChannel'))||(platform==='youtube'?'zJwMfRgk3OE':'technoconqueror');
+if(platform==='youtube'){
+  const id=parseYt(source);
+  document.getElementById('stream').src=`https://www.youtube.com/embed/${encodeURIComponent(id)}?autoplay=1&mute=0&playsinline=1&rel=0&enablejsapi=1`;
+  document.getElementById('chatFrame').src=`https://www.youtube.com/live_chat?v=${encodeURIComponent(id)}&embed_domain=${encodeURIComponent(parent)}`;
+  document.getElementById('metricsBtn').style.display='none';
+}else{
+  const channel=cleanTwitch(source);
+  document.getElementById('stream').src=`https://player.twitch.tv/?channel=${channel}&parent=${parent}&autoplay=true&muted=false`;
+  document.getElementById('chatFrame').src=`https://www.twitch.tv/embed/${channel}/chat?parent=${parent}&darkpopout`;
+  document.getElementById('metricsFrame').src=`https://twitchtracker.com/${encodeURIComponent(channel)}`;
+  document.getElementById('metricsLabel').textContent=`TWITCHTRACKER / ${channel}`;
+}
+document.getElementById('chatBtn').onclick=()=>document.getElementById('chat').classList.toggle('closed');document.getElementById('metricsBtn').onclick=()=>document.getElementById('metrics').classList.add('open');document.getElementById('closeMetrics').onclick=()=>document.getElementById('metrics').classList.remove('open');</script></body></html>

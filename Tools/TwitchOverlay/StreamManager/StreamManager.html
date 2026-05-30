@@ -1,0 +1,1608 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Streamer-side Twitch Stream Portal builder with live preview, config panel, and overlay element library." />
+  <meta name="theme-color" content="#9146FF" />
+  <title>Streamer View Portal Config Builder</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+
+  <style>
+    :root {
+      --accent: #9146ff;
+      --cyan: #00ffd5;
+      --bg: #07070b;
+      --panel: #121222;
+      --panel2: #1b1b2f;
+      --border: #31314f;
+      --chat-width: 400px;
+      --radius: 18px;
+      --glow: 18px;
+      --overlay-scale: 1;
+    }
+
+    * { box-sizing: border-box; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f0f1b; }
+    ::-webkit-scrollbar-thumb { background: #3b2b5c; border-radius: 10px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    body {
+      background: var(--bg);
+      color: #f8fafc;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .chat-transition { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    .pulse-ring {
+      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+      animation: pulse 1.6s infinite cubic-bezier(0.66, 0, 0, 1);
+    }
+
+    @keyframes pulse {
+      to { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+    }
+
+    @keyframes scanlinesMove {
+      from { background-position-y: 0; }
+      to { background-position-y: 32px; }
+    }
+
+    .glass-panel {
+      background: rgba(18, 18, 34, 0.86);
+      border: 1px solid rgba(49, 49, 79, 0.9);
+      backdrop-filter: blur(18px);
+      box-shadow: 0 20px 80px rgba(0,0,0,.45);
+    }
+
+    .config-input {
+      width: 100%;
+      background: #1b1b2f;
+      border: 1px solid #31314f;
+      color: #e5e7eb;
+      font-size: 13px;
+      padding: 9px 11px;
+      border-radius: 12px;
+      outline: none;
+      transition: .18s ease;
+    }
+
+    .config-input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(145, 70, 255, 0.35);
+    }
+
+    .config-label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: #a1a1aa;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: .13em;
+      font-weight: 800;
+      margin-bottom: 6px;
+    }
+
+    .range {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .builder-shell {
+      height: 100vh;
+      display: grid;
+      grid-template-columns: 310px minmax(0, 1fr) 420px;
+      background:
+        radial-gradient(circle at top left, rgba(145,70,255,.14), transparent 32%),
+        radial-gradient(circle at bottom right, rgba(0,255,213,.08), transparent 34%),
+        var(--bg);
+    }
+
+    .left-library,
+    .right-config {
+      min-height: 0;
+      overflow-y: auto;
+      border-color: #232338;
+    }
+
+    .library-card {
+      border: 1px solid #31314f;
+      background: rgba(27,27,47,.75);
+      border-radius: 15px;
+      padding: 10px;
+      cursor: grab;
+      transition: .16s ease;
+    }
+
+    .library-card:hover {
+      border-color: var(--cyan);
+      transform: translateY(-1px);
+      box-shadow: 0 0 24px rgba(0,255,213,.12);
+    }
+
+    .portal-frame-wrap {
+      position: relative;
+      min-height: 0;
+      overflow: hidden;
+      border-left: 1px solid #232338;
+      border-right: 1px solid #232338;
+      background: #020207;
+    }
+
+    .portal-preview-scale {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform: scale(var(--overlay-scale));
+      transform-origin: center center;
+    }
+
+    #topNavbar {
+      background: var(--panel);
+      border-bottom-color: #232338;
+      border-radius: 0 0 var(--radius) var(--radius);
+    }
+
+    #floatingChatToggleBtn,
+    #sendToPortalBtn,
+    .overlay-action-button {
+      border-radius: var(--radius);
+      box-shadow: 0 0 var(--glow) rgba(145, 70, 255, .24);
+    }
+
+    #chatDock {
+      width: var(--chat-width);
+      border-color: #232338;
+      background: rgba(14,14,26,.95);
+      backdrop-filter: blur(14px);
+      border-radius: var(--radius) 0 0 var(--radius);
+      box-shadow: -30px 0 90px rgba(0,0,0,.48);
+    }
+
+    #videoContainer::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: var(--scan-opacity, 0);
+      background-image: repeating-linear-gradient(0deg, transparent 0px, transparent var(--scan-gap, 7px), rgba(0,255,213,.55) calc(var(--scan-gap, 7px) + 1px), transparent calc(var(--scan-gap, 7px) + 2px));
+      animation: scanlinesMove var(--scan-speed, 8s) linear infinite;
+      mix-blend-mode: screen;
+      z-index: 32;
+    }
+
+    .portal-element {
+      position: absolute;
+      z-index: 36;
+      pointer-events: auto;
+      border: 1px dashed rgba(0,255,213,.55);
+      border-radius: 14px;
+      padding: 8px 12px;
+      background: rgba(18,18,34,.7);
+      color: white;
+      box-shadow: 0 0 24px rgba(0,255,213,.16);
+    }
+
+    .portal-element iframe {
+      pointer-events: none;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      border-radius: inherit;
+      background: transparent;
+    }
+
+    details > summary { list-style: none; }
+    details > summary::-webkit-details-marker { display: none; }
+
+    .mode-pill.active {
+      background: var(--accent);
+      color: white;
+      border-color: rgba(255,255,255,.18);
+    }
+
+    @media (max-width: 1280px) {
+      .builder-shell { grid-template-columns: 280px minmax(0, 1fr); }
+      .right-config {
+        position: fixed;
+        right: 16px;
+        top: 78px;
+        bottom: 16px;
+        width: min(420px, calc(100vw - 32px));
+        z-index: 80;
+        border-radius: 22px;
+        transform: translateX(calc(100% + 32px));
+        transition: .25s ease;
+      }
+      .right-config.open { transform: translateX(0); }
+    }
+
+    @media (max-width: 880px) {
+      .builder-shell { grid-template-columns: 1fr; }
+      .left-library {
+        position: fixed;
+        left: 12px;
+        top: 78px;
+        bottom: 12px;
+        width: min(310px, calc(100vw - 24px));
+        z-index: 75;
+        border-radius: 22px;
+        transform: translateX(calc(-100% - 24px));
+        transition: .25s ease;
+      }
+      .left-library.open { transform: translateX(0); }
+    }
+
+
+    .metrics-panel {
+      position: absolute;
+      right: 18px;
+      bottom: 18px;
+      width: min(760px, calc(100% - 36px));
+      height: min(560px, calc(100% - 120px));
+      z-index: 50;
+      border: 1px solid rgba(0,255,213,.35);
+      border-radius: var(--radius);
+      background: rgba(7,7,11,.88);
+      box-shadow: 0 0 40px rgba(0,255,213,.16), 0 30px 90px rgba(0,0,0,.55);
+      overflow: hidden;
+      backdrop-filter: blur(16px);
+    }
+    .metrics-panel.hidden { display: none; }
+    .metrics-head {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 12px;
+      background: rgba(18,18,34,.95);
+      border-bottom: 1px solid rgba(49,49,79,.9);
+      color: #eaffff;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .metrics-panel iframe { width:100%; height:calc(100% - 44px); border:0; background:#05050a; }
+    .metrics-actions { display:flex; align-items:center; gap:8px; }
+    .metrics-actions button,.metrics-actions a { border:1px solid rgba(0,255,213,.35); background:rgba(0,255,213,.08); color:#eaffff; border-radius:10px; padding:6px 9px; font-size:11px; font-weight:900; text-decoration:none; }
+    .asset-import-card { border:1px dashed rgba(0,255,213,.35); background:rgba(0,255,213,.06); border-radius:16px; padding:12px; }
+    .profile-required { outline: 1px solid rgba(239,68,68,.5); box-shadow: 0 0 0 2px rgba(239,68,68,.08); }
+
+    .action-editor-card { border:1px solid rgba(145,70,255,.35); background:rgba(145,70,255,.08); border-radius:16px; padding:12px; }
+    .portal-element iframe { width:100%; height:100%; min-height:70px; border:0; background:transparent; pointer-events:auto; }
+    .portal-element .action-badge { position:absolute; right:6px; top:6px; z-index:4; font-size:9px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; padding:3px 6px; border-radius:999px; border:1px solid rgba(0,255,213,.35); background:rgba(0,0,0,.58); color:#00ffd5; pointer-events:none; }
+
+  </style>
+</head>
+<body>
+  <script>
+    // ==========================================
+    // REQUIRED DEFAULTS / VIEWER PORTAL FLAGS
+    // Kept true by default and exposed in Config.
+    // ==========================================
+    let ALLOW_CUSTOM_LOADER = true;
+    let FLOATING_CHAT_OVERLAY = true;
+    const ENABLE_CONFIG_PANEL = true;
+  </script>
+
+  <div class="builder-shell">
+    <!-- LEFT HAND ELEMENT LIBRARY -->
+    <aside id="leftLibrary" class="left-library bg-[#0d0d18]/95 border-r border-[#232338] p-4 space-y-4">
+      <div class="flex items-center justify-between gap-2">
+        <div>
+          <h2 class="text-sm font-black tracking-widest uppercase text-white">Element Library</h2>
+          <p class="text-[11px] text-gray-400">Fetched from <span class="text-[#00ffd5]">../OverlayBuilder/OverlayTools.html</span></p>
+        </div>
+        <button id="reloadLibraryBtn" class="p-2 rounded-xl bg-[#1b1b2f] border border-[#31314f] hover:border-[#00ffd5] transition" title="Reload Library">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <div class="relative">
+        <i data-lucide="search" class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+        <input id="librarySearch" class="config-input pl-9" placeholder="Search overlays, buttons, labels..." />
+      </div>
+
+      <details open class="glass-panel rounded-2xl p-3">
+        <summary class="flex items-center justify-between cursor-pointer">
+          <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">Fetched Elements</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+        </summary>
+        <div id="fetchedElementsList" class="mt-3 grid grid-cols-1 gap-2"></div>
+      </details>
+
+      <details open class="glass-panel rounded-2xl p-3">
+        <summary class="flex items-center justify-between cursor-pointer">
+          <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">Built-In Fallbacks</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+        </summary>
+        <div id="fallbackElementsList" class="mt-3 grid grid-cols-1 gap-2"></div>
+      </details>
+
+      <div class="glass-panel rounded-2xl p-3 text-[11px] text-gray-400 leading-relaxed">
+        Drop/click an element to add it into the portal preview. Elements are loaded from the external builder file when the browser can access it. If fetch is blocked by local file rules, use the built-in fallback cards for now.
+      </div>
+    </aside>
+
+    <!-- CENTER PREVIEW / VIEWER PORTAL -->
+    <main class="portal-frame-wrap">
+      <!-- Builder top overlay toolbar -->
+      <div class="absolute top-4 left-4 right-4 z-[90] flex items-center justify-between gap-3 pointer-events-none">
+        <div class="flex items-center gap-2 pointer-events-auto">
+          <button id="libraryToggleBtn" class="xl:hidden bg-[#121222]/90 border border-[#31314f] px-3 py-2 rounded-xl text-xs font-bold hover:border-[#00ffd5] transition flex items-center gap-2">
+            <i data-lucide="panel-left" class="w-4 h-4"></i> Library
+          </button>
+          <button id="configToggleBtn" class="bg-[#121222]/90 border border-[#31314f] px-3 py-2 rounded-xl text-xs font-bold hover:border-[#00ffd5] transition flex items-center gap-2">
+            <i data-lucide="sliders-horizontal" class="w-4 h-4"></i> Config
+          </button>
+          <span class="hidden md:inline-flex bg-red-500/15 text-red-300 text-[10px] font-black px-2.5 py-1 rounded-full border border-red-500/25 items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-red-500 pulse-ring"></span> STREAMER PREVIEW MODE
+          </span>
+        </div>
+        <button id="sendToPortalBtn" class="pointer-events-auto bg-[#9146FF] hover:bg-[#772ce8] border border-white/10 text-white text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-xl transition active:scale-95 flex items-center gap-2">
+          <i data-lucide="send" class="w-4 h-4"></i> Send To Stream Portal
+        </button>
+      </div>
+
+      <div id="portalPreview" class="portal-preview-scale h-full w-full">
+        <!-- Header / custom loader -->
+        <header id="topNavbar" class="absolute top-0 left-0 right-0 px-4 py-3 flex flex-wrap items-center justify-between gap-4 z-40 shrink-0 transition-all duration-300">
+          <div class="flex items-center gap-3">
+            <div id="brandIcon" class="w-10 h-10 rounded-xl bg-gradient-to-tr from-[#9146FF] to-[#00ffd5] flex items-center justify-center shadow-lg shadow-purple-950/40">
+              <i data-lucide="tv" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h1 id="brandTitle" class="font-bold tracking-tight text-white text-base md:text-lg">Stream Portal</h1>
+                <span class="bg-red-500/15 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500/20 flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-red-500 pulse-ring"></span> LIVE
+                </span>
+              </div>
+              <p class="text-xs text-gray-400">Current Channel: <span id="currentChannelLabel" class="text-[#00ffd5] font-semibold">Loading...</span></p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <div class="relative flex-1 sm:w-64">
+              <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+              <input id="channelInput" type="text" value="technoconqueror" placeholder="Twitch channel or YouTube video URL/ID..." class="w-full bg-[#1b1b2f] border border-[#31314f] text-sm text-gray-200 pl-9 pr-4 py-2 rounded-xl focus:outline-none focus:border-[#9146FF] focus:ring-1 focus:ring-[#9146FF] transition" />
+            </div>
+            <button id="loadBtn" class="bg-[#9146FF] hover:bg-[#772ce8] text-white text-sm font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2 active:scale-95">
+              <i data-lucide="play" class="w-4 h-4"></i> Load
+            </button>
+            <button id="chatToggleBtn" class="bg-[#1b1b2f] hover:bg-[#252542] border border-[#31314f] text-gray-200 text-sm font-semibold px-4 py-2 rounded-xl transition flex items-center gap-2 active:scale-95" title="Toggle Chat">
+              <i data-lucide="message-square" id="chatIcon" class="w-4 h-4"></i>
+              <span id="chatBtnText" class="hidden md:inline">Hide Chat</span>
+            </button>
+          </div>
+        </header>
+
+        <main class="h-full flex w-full relative overflow-hidden bg-[#07070b]">
+          <div id="videoContainer" class="flex-1 h-full relative bg-black">
+            <div id="clickShield" class="absolute inset-0 z-20 bg-transparent hidden"></div>
+
+            <button id="floatingChatToggleBtn" class="absolute top-20 right-4 z-40 bg-[#121222]/85 hover:bg-[#1b1b2f]/95 border border-[#31314f] text-gray-200 px-3.5 py-2.5 rounded-xl shadow-2xl backdrop-blur-md transition-all active:scale-95 flex items-center gap-2" title="Toggle Chat (Press 'T' to toggle)">
+              <i data-lucide="message-square" id="floatingChatIcon" class="w-4 h-4 text-[#00ffd5]"></i>
+              <span id="floatingChatBtnText" class="text-xs font-bold tracking-wide">Hide Chat</span>
+            </button>
+
+            <iframe id="videoFrame" class="absolute inset-0 w-full h-full z-10 pointer-events-auto" allowfullscreen allow="autoplay; fullscreen" src=""></iframe>
+            <div id="overlayLayer" class="absolute inset-0 z-35 pointer-events-none"></div>
+          </div>
+
+          <aside id="chatDock" class="chat-transition absolute top-0 right-0 h-full z-30 shadow-2xl border-l bg-[#0e0e1a]/95 backdrop-blur-md flex flex-col">
+            <div class="px-4 py-3 border-b border-[#232338] bg-[#121222] flex items-center justify-between shrink-0">
+              <div class="flex items-center gap-2 text-gray-200 font-semibold text-sm">
+                <i data-lucide="message-square-text" class="w-4 h-4 text-[#9146FF]"></i>
+                <span id="chatTitle">Live Chat</span>
+              </div>
+              <button id="chatCloseBtn" class="p-1 rounded bg-transparent hover:bg-white/5 text-gray-400 hover:text-white transition" title="Collapse Chat">
+                <i data-lucide="chevrons-right" class="w-4 h-4"></i>
+              </button>
+            </div>
+            <div class="flex-1 relative bg-[#09090e]">
+              <iframe id="chatFrame" class="absolute inset-0 w-full h-full" src=""></iframe>
+            </div>
+          </aside>
+        </main>
+      </div>
+
+      <div id="toast" class="fixed bottom-6 right-6 bg-[#181829] border border-[#9146FF]/30 px-4 py-3 rounded-xl shadow-2xl text-sm text-gray-200 flex items-center gap-2 opacity-0 transform translate-y-2 pointer-events-none transition-all duration-300 z-[120]">
+        <i data-lucide="info" class="w-4 h-4 text-[#00ffd5]"></i>
+        <span id="toastText">Portal loaded successfully!</span>
+      </div>
+    </main>
+
+    <!-- RIGHT HAND CONFIG PANEL -->
+    <aside id="rightConfig" class="right-config bg-[#0d0d18]/95 border-l border-[#232338] p-4 space-y-4">
+      <div class="flex items-center justify-between gap-2 sticky top-0 bg-[#0d0d18]/95 backdrop-blur-xl z-20 pb-3 border-b border-[#232338]">
+        <div>
+          <h2 class="text-sm font-black tracking-widest uppercase text-white">Portal Config</h2>
+          <p class="text-[11px] text-gray-400">Streamer/admin setup view</p>
+        </div>
+        <button id="saveConfigBtn" class="bg-[#00ffd5]/10 border border-[#00ffd5]/40 text-[#00ffd5] px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#00ffd5]/20 transition">
+          Save Local
+        </button>
+      </div>
+
+      <details open class="glass-panel rounded-2xl p-4">
+        <summary class="flex items-center justify-between cursor-pointer">
+          <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">1. Required Portal Modes</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+        </summary>
+        <div class="mt-4 space-y-3">
+          <label class="flex items-center justify-between gap-3 bg-[#1b1b2f]/70 border border-[#31314f] rounded-xl px-3 py-2">
+            <span class="text-xs font-bold text-gray-200">ALLOW_CUSTOM_LOADER</span>
+            <input id="allowCustomLoaderToggle" type="checkbox" checked class="accent-[#9146FF] w-5 h-5" />
+          </label>
+          <label class="flex items-center justify-between gap-3 bg-[#1b1b2f]/70 border border-[#31314f] rounded-xl px-3 py-2">
+            <span class="text-xs font-bold text-gray-200">FLOATING_CHAT_OVERLAY</span>
+            <input id="floatingChatOverlayToggle" type="checkbox" checked class="accent-[#9146FF] w-5 h-5" />
+          </label>
+        </div>
+      </details>
+
+      <details open class="glass-panel rounded-2xl p-4">
+        <summary class="flex items-center justify-between cursor-pointer">
+          <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">2. Channel / Embed</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+        </summary>
+        <div class="mt-4 space-y-3">
+          <div>
+            <label class="config-label">Platform</label>
+            <select id="configPlatform" class="config-input">
+              <option value="twitch" selected>Twitch</option>
+              <option value="youtube">YouTube</option>
+            </select>
+          </div>
+          <div>
+            <label class="config-label">Channel / Video Source</label>
+            <input id="configChannel" class="config-input" value="technoconqueror" placeholder="Twitch name, YouTube video ID, or YouTube URL" />
+          </div>
+          <div>
+            <label class="config-label">Parent Domain</label>
+            <input id="configParentDomain" class="config-input" value="localhost" />
+          </div>
+          <button id="applyChannelBtn" class="w-full bg-[#9146FF] hover:bg-[#772ce8] text-white text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-xl transition">Apply Channel</button>
+        </div>
+      </details>
+
+      <details open class="glass-panel rounded-2xl p-4">
+        <summary class="flex items-center justify-between cursor-pointer">
+          <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">3. Brand / Loader</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+        </summary>
+        <div class="mt-4 space-y-3">
+          <div><label class="config-label">Title</label><input id="configTitle" class="config-input" value="Stream Portal" /></div>
+          <div><label class="config-label">Chat Title</label><input id="configChatTitle" class="config-input" value="Live Chat" /></div>
+          <div><label class="config-label">Accent Color</label><input id="accentColor" type="color" value="#9146ff" class="w-full h-10 rounded-xl bg-[#1b1b2f] border border-[#31314f]" /></div>
+          <div><label class="config-label">Cyan / Detail Color</label><input id="cyanColor" type="color" value="#00ffd5" class="w-full h-10 rounded-xl bg-[#1b1b2f] border border-[#31314f]" /></div>
+          <div><label class="config-label">Panel Color</label><input id="panelColor" type="color" value="#121222" class="w-full h-10 rounded-xl bg-[#1b1b2f] border border-[#31314f]" /></div>
+          <div><label class="config-label">Border Color</label><input id="borderColor" type="color" value="#31314f" class="w-full h-10 rounded-xl bg-[#1b1b2f] border border-[#31314f]" /></div>
+        </div>
+      </details>
+
+      <details open class="glass-panel rounded-2xl p-4">
+        <summary class="flex items-center justify-between cursor-pointer">
+          <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">4. Layout / Shape</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+        </summary>
+        <div class="mt-4 space-y-4">
+          <div>
+            <label class="config-label"><span>Chat Width</span><span id="chatWidthValue">400px</span></label>
+            <input id="chatWidthRange" class="range" type="range" min="280" max="620" value="400" />
+          </div>
+          <div>
+            <label class="config-label"><span>Corner Radius</span><span id="radiusValue">18px</span></label>
+            <input id="radiusRange" class="range" type="range" min="0" max="40" value="18" />
+          </div>
+          <div>
+            <label class="config-label"><span>Glow Power</span><span id="glowValue">18px</span></label>
+            <input id="glowRange" class="range" type="range" min="0" max="60" value="18" />
+          </div>
+          <div>
+            <label class="config-label"><span>Preview Scale</span><span id="previewScaleValue">100%</span></label>
+            <input id="previewScaleRange" class="range" type="range" min="60" max="120" value="100" />
+          </div>
+        </div>
+      </details>
+
+      <details open class="glass-panel rounded-2xl p-4">
+        <summary class="flex items-center justify-between cursor-pointer">
+          <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">5. HUD / Scanline FX</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+        </summary>
+        <div class="mt-4 space-y-4">
+          <label class="flex items-center justify-between gap-3 bg-[#1b1b2f]/70 border border-[#31314f] rounded-xl px-3 py-2">
+            <span class="text-xs font-bold text-gray-200">Enable Scanlines</span>
+            <input id="scanlineToggle" type="checkbox" checked class="accent-[#9146FF] w-5 h-5" />
+          </label>
+          <div>
+            <label class="config-label"><span>Scan Opacity</span><span id="scanOpacityValue">18%</span></label>
+            <input id="scanOpacityRange" class="range" type="range" min="0" max="80" value="18" />
+          </div>
+          <div>
+            <label class="config-label"><span>Scanline Gap</span><span id="scanGapValue">7px</span></label>
+            <input id="scanGapRange" class="range" type="range" min="2" max="24" value="7" />
+          </div>
+          <div>
+            <label class="config-label"><span>Scanline Speed</span><span id="scanSpeedValue">8s</span></label>
+            <input id="scanSpeedRange" class="range" type="range" min="1" max="20" value="8" />
+          </div>
+        </div>
+      </details>
+
+      <details open class="glass-panel rounded-2xl p-4">
+        <summary class="flex items-center justify-between cursor-pointer">
+          <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">6. Selected Element</span>
+          <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+        </summary>
+        <div class="mt-4 space-y-3">
+          <div class="text-[11px] text-gray-400">Selected: <span id="selectedElementLabel" class="text-[#00ffd5] font-bold">None</span></div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="nudgeLeftBtn" class="bg-[#1b1b2f] border border-[#31314f] rounded-xl px-3 py-2 text-xs font-bold hover:border-[#00ffd5]">← Left</button>
+            <button id="nudgeRightBtn" class="bg-[#1b1b2f] border border-[#31314f] rounded-xl px-3 py-2 text-xs font-bold hover:border-[#00ffd5]">Right →</button>
+            <button id="nudgeUpBtn" class="bg-[#1b1b2f] border border-[#31314f] rounded-xl px-3 py-2 text-xs font-bold hover:border-[#00ffd5]">↑ Up</button>
+            <button id="nudgeDownBtn" class="bg-[#1b1b2f] border border-[#31314f] rounded-xl px-3 py-2 text-xs font-bold hover:border-[#00ffd5]">Down ↓</button>
+          </div>
+          <button id="deleteElementBtn" class="w-full bg-red-500/10 border border-red-500/40 text-red-300 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-red-500/20 transition">Delete Selected</button>
+        </div>
+      </details>
+    </aside>
+  </div>
+
+  <script>
+    // ==========================================
+    // APP ELEMENTS
+    // ==========================================
+    const $ = (id) => document.getElementById(id);
+
+    const topNavbar = $('topNavbar');
+    const channelInput = $('channelInput');
+    const loadBtn = $('loadBtn');
+    const chatToggleBtn = $('chatToggleBtn');
+    const chatIcon = $('chatIcon');
+    const chatBtnText = $('chatBtnText');
+    const floatingChatToggleBtn = $('floatingChatToggleBtn');
+    const floatingChatIcon = $('floatingChatIcon');
+    const floatingChatBtnText = $('floatingChatBtnText');
+    const chatCloseBtn = $('chatCloseBtn');
+    const chatDock = $('chatDock');
+    const clickShield = $('clickShield');
+    const videoFrame = $('videoFrame');
+    const chatFrame = $('chatFrame');
+    const currentChannelLabel = $('currentChannelLabel');
+    const toast = $('toast');
+    const toastText = $('toastText');
+    const overlayLayer = $('overlayLayer');
+
+    let chatCollapsed = false;
+    let selectedElementId = null;
+    let portalElements = [];
+
+    const BUILT_IN_ELEMENTS = [
+      { id: 'label-live', name: 'LIVE HUD Label', type: 'label', html: '<strong>LIVE</strong> // TRANSMISSION', w: 220, h: 46, x: 42, y: 150 },
+      { id: 'sub-goal', name: 'Subscriber Goal Plate', type: 'plate', html: 'SUB GOAL: 420 / 500', w: 250, h: 48, x: 52, y: 220 },
+      { id: 'social-discord', name: 'Discord CTA Button', type: 'button', html: 'JOIN DISCORD', w: 200, h: 52, x: 56, y: 292 },
+      { id: 'sponsor-panel', name: 'Sponsor Lower Third', type: 'lower-third', html: 'POWERED BY IRON WILL INTERACTIVE', w: 410, h: 58, x: 340, y: 680 },
+      { id: 'camera-border', name: 'Webcam Border Box', type: 'frame', html: 'WEBCAM FRAME', w: 320, h: 190, x: 60, y: 420 },
+    ];
+
+    // ==========================================
+    // CORE PORTAL FUNCTIONS
+    // ==========================================
+    function getParentDomain() {
+      const configured = $('configParentDomain').value.trim();
+      return configured || window.location.hostname || 'localhost';
+    }
+
+    function showToast(message) {
+      toastText.innerText = message;
+      toast.classList.remove('opacity-0', 'translate-y-2', 'pointer-events-none');
+      toast.classList.add('opacity-100', 'translate-y-0');
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', 'translate-y-2', 'pointer-events-none');
+      }, 2600);
+    }
+
+    function getPlatform() {
+      return ($('configPlatform')?.value || 'twitch').toLowerCase() === 'youtube' ? 'youtube' : 'twitch';
+    }
+
+    function cleanTwitchChannel(value) {
+      return String(value || 'technoconqueror').trim().toLowerCase().replace(/^https?:\/\/(www\.)?twitch\.tv\//i, '').split(/[/?#]/)[0].replace(/[^a-z0-9_]/g, '') || 'technoconqueror';
+    }
+
+    function parseYouTubeSource(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return { id: '', label: '' };
+      const patterns = [/[?&]v=([A-Za-z0-9_-]{6,})/, /youtu\.be\/([A-Za-z0-9_-]{6,})/, /\/embed\/([A-Za-z0-9_-]{6,})/, /\/live\/([A-Za-z0-9_-]{6,})/, /\/shorts\/([A-Za-z0-9_-]{6,})/];
+      for (const pattern of patterns) {
+        const match = raw.match(pattern);
+        if (match) return { id: match[1], label: match[1] };
+      }
+      const compact = raw.replace(/[^A-Za-z0-9_-]/g, '');
+      return { id: compact, label: compact };
+    }
+
+    function getEmbedSources(platform, source) {
+      const parent = getParentDomain();
+      if (platform === 'youtube') {
+        const yt = parseYouTubeSource(source);
+        if (!yt.id) return null;
+        return {
+          label: `YouTube: ${yt.label}`,
+          cleanSource: yt.id,
+          videoSrc: `https://www.youtube.com/embed/${encodeURIComponent(yt.id)}?autoplay=1&mute=0&playsinline=1&rel=0&enablejsapi=1`,
+          chatSrc: `https://www.youtube.com/live_chat?v=${encodeURIComponent(yt.id)}&embed_domain=${encodeURIComponent(parent)}`,
+          storageKey: 'selectedYouTubeSource'
+        };
+      }
+      const channel = cleanTwitchChannel(source);
+      return {
+        label: `Twitch: ${channel}`,
+        cleanSource: channel,
+        videoSrc: `https://player.twitch.tv/?channel=${channel}&parent=${parent}&autoplay=true&muted=false`,
+        chatSrc: `https://www.twitch.tv/embed/${channel}/chat?parent=${parent}&darkpopout`,
+        storageKey: 'selectedTwitchChannel'
+      };
+    }
+
+    function loadStream(channelName) {
+      const platform = getPlatform();
+      const sources = getEmbedSources(platform, channelName);
+      if (!sources) {
+        showToast('Please enter a valid stream source.');
+        return;
+      }
+
+      videoFrame.src = sources.videoSrc;
+      chatFrame.src = sources.chatSrc;
+      currentChannelLabel.textContent = sources.label;
+      channelInput.value = sources.cleanSource;
+      $('configChannel').value = sources.cleanSource;
+
+      localStorage.setItem('selectedStreamPlatform', platform);
+      localStorage.setItem(sources.storageKey, sources.cleanSource);
+      showToast(`Now watching: ${sources.label}`);
+    }
+
+    function toggleChat(forceState = null) {
+      chatCollapsed = (forceState !== null) ? forceState : !chatCollapsed;
+
+      if (chatCollapsed) {
+        if (FLOATING_CHAT_OVERLAY) {
+          chatDock.classList.add('opacity-0', 'translate-x-full', 'pointer-events-none');
+          chatDock.classList.remove('opacity-100', 'translate-x-0', 'pointer-events-auto');
+          clickShield.classList.add('hidden');
+        } else {
+          chatDock.classList.add('w-0', 'invisible', 'opacity-0');
+          chatDock.classList.remove('md:w-[350px]', 'lg:w-[400px]', 'w-full');
+        }
+        chatIcon.setAttribute('data-lucide', 'message-square-off');
+        chatBtnText.textContent = 'Show Chat';
+        floatingChatIcon.setAttribute('data-lucide', 'message-square-off');
+        floatingChatBtnText.textContent = 'Show Chat';
+      } else {
+        if (FLOATING_CHAT_OVERLAY) {
+          chatDock.classList.remove('opacity-0', 'translate-x-full', 'pointer-events-none');
+          chatDock.classList.add('opacity-100', 'translate-x-0', 'pointer-events-auto');
+          clickShield.classList.remove('hidden');
+        } else {
+          chatDock.classList.remove('w-0', 'invisible', 'opacity-0');
+          chatDock.classList.add('md:w-[350px]', 'lg:w-[400px]', 'w-full');
+        }
+        chatIcon.setAttribute('data-lucide', 'message-square');
+        chatBtnText.textContent = 'Hide Chat';
+        floatingChatIcon.setAttribute('data-lucide', 'message-square');
+        floatingChatBtnText.textContent = 'Hide Chat';
+      }
+      lucide.createIcons();
+    }
+
+    function applyConfigPanelGate() {
+      const visible = !!ENABLE_CONFIG_PANEL;
+      $('rightConfig')?.classList.toggle('hidden', !visible);
+      $('configToggleBtn')?.classList.toggle('hidden', !visible);
+    }
+
+    function setupLayoutConfiguration() {
+      if (ALLOW_CUSTOM_LOADER) {
+        topNavbar.classList.remove('hidden');
+        floatingChatToggleBtn.classList.remove('top-4');
+        floatingChatToggleBtn.classList.add('top-20');
+      } else {
+        topNavbar.classList.add('hidden');
+        floatingChatToggleBtn.classList.remove('top-20');
+        floatingChatToggleBtn.classList.add('top-4');
+      }
+
+      if (FLOATING_CHAT_OVERLAY) {
+        chatDock.className = 'chat-transition absolute top-0 right-0 h-full z-30 shadow-2xl border-l bg-[#0e0e1a]/95 backdrop-blur-md flex flex-col';
+        chatDock.style.width = 'var(--chat-width)';
+        if (chatCollapsed) {
+          chatDock.classList.add('opacity-0', 'translate-x-full', 'pointer-events-none');
+        } else {
+          chatDock.classList.add('opacity-100', 'translate-x-0', 'pointer-events-auto');
+          clickShield.classList.remove('hidden');
+        }
+      } else {
+        chatDock.className = 'chat-transition w-full md:w-[350px] lg:w-[400px] h-full border-l bg-[#0e0e1a] flex flex-col shrink-0';
+        chatDock.style.width = '';
+        clickShield.classList.add('hidden');
+        if (chatCollapsed) chatDock.classList.add('w-0', 'invisible', 'opacity-0');
+      }
+    }
+
+    // ==========================================
+    // CONFIG BINDINGS
+    // ==========================================
+    function setCssVar(name, value) {
+      document.documentElement.style.setProperty(name, value);
+    }
+
+    function applyConfig() {
+      ALLOW_CUSTOM_LOADER = $('allowCustomLoaderToggle').checked;
+      FLOATING_CHAT_OVERLAY = $('floatingChatOverlayToggle').checked;
+
+      setCssVar('--accent', $('accentColor').value);
+      setCssVar('--cyan', $('cyanColor').value);
+      setCssVar('--panel', $('panelColor').value);
+      setCssVar('--border', $('borderColor').value);
+      setCssVar('--chat-width', `${$('chatWidthRange').value}px`);
+      setCssVar('--radius', `${$('radiusRange').value}px`);
+      setCssVar('--glow', `${$('glowRange').value}px`);
+      setCssVar('--overlay-scale', `${$('previewScaleRange').value / 100}`);
+
+      $('brandTitle').textContent = $('configTitle').value || 'Stream Portal';
+      $('chatTitle').textContent = $('configChatTitle').value || 'Live Chat';
+
+      $('chatWidthValue').textContent = `${$('chatWidthRange').value}px`;
+      $('radiusValue').textContent = `${$('radiusRange').value}px`;
+      $('glowValue').textContent = `${$('glowRange').value}px`;
+      $('previewScaleValue').textContent = `${$('previewScaleRange').value}%`;
+
+      const scanEnabled = $('scanlineToggle').checked;
+      setCssVar('--scan-opacity', scanEnabled ? `${$('scanOpacityRange').value / 100}` : '0');
+      setCssVar('--scan-gap', `${$('scanGapRange').value}px`);
+      setCssVar('--scan-speed', `${$('scanSpeedRange').value}s`);
+      $('scanOpacityValue').textContent = `${$('scanOpacityRange').value}%`;
+      $('scanGapValue').textContent = `${$('scanGapRange').value}px`;
+      $('scanSpeedValue').textContent = `${$('scanSpeedRange').value}s`;
+
+      if ($('configPlatform')) {
+        const isYouTube = getPlatform() === 'youtube';
+        channelInput.placeholder = isYouTube ? 'YouTube video URL or ID...' : 'Twitch channel...';
+      }
+      setupLayoutConfiguration();
+      applyConfigPanelGate();
+      lucide.createIcons();
+    }
+
+    function serializeConfig() {
+      return {
+        ALLOW_CUSTOM_LOADER,
+        FLOATING_CHAT_OVERLAY,
+        platform: getPlatform(),
+        channel: $('configChannel').value,
+        parentDomain: $('configParentDomain').value,
+        title: $('configTitle').value,
+        chatTitle: $('configChatTitle').value,
+        accent: $('accentColor').value,
+        cyan: $('cyanColor').value,
+        panel: $('panelColor').value,
+        border: $('borderColor').value,
+        chatWidth: $('chatWidthRange').value,
+        radius: $('radiusRange').value,
+        glow: $('glowRange').value,
+        previewScale: $('previewScaleRange').value,
+        scanlines: $('scanlineToggle').checked,
+        scanOpacity: $('scanOpacityRange').value,
+        scanGap: $('scanGapRange').value,
+        scanSpeed: $('scanSpeedRange').value,
+        elements: portalElements
+      };
+    }
+
+    function loadSavedConfig() {
+      try {
+        const raw = localStorage.getItem('streamerViewPortalBuilderConfig');
+        if (!raw) return;
+        const c = JSON.parse(raw);
+        $('allowCustomLoaderToggle').checked = c.ALLOW_CUSTOM_LOADER ?? true;
+        $('floatingChatOverlayToggle').checked = c.FLOATING_CHAT_OVERLAY ?? true;
+        if ($('configPlatform')) $('configPlatform').value = (c.platform === 'youtube') ? 'youtube' : 'twitch';
+        $('configChannel').value = c.channel || 'technoconqueror';
+        $('configParentDomain').value = c.parentDomain || (window.location.hostname || 'localhost');
+        $('configTitle').value = c.title || 'Stream Portal';
+        $('configChatTitle').value = c.chatTitle || 'Live Chat';
+        $('accentColor').value = c.accent || '#9146ff';
+        $('cyanColor').value = c.cyan || '#00ffd5';
+        $('panelColor').value = c.panel || '#121222';
+        $('borderColor').value = c.border || '#31314f';
+        $('chatWidthRange').value = c.chatWidth || 400;
+        $('radiusRange').value = c.radius || 18;
+        $('glowRange').value = c.glow || 18;
+        $('previewScaleRange').value = c.previewScale || 100;
+        $('scanlineToggle').checked = c.scanlines ?? true;
+        $('scanOpacityRange').value = c.scanOpacity || 18;
+        $('scanGapRange').value = c.scanGap || 7;
+        $('scanSpeedRange').value = c.scanSpeed || 8;
+        portalElements = Array.isArray(c.elements) ? c.elements : [];
+      } catch (err) {
+        console.warn('Failed to load saved config', err);
+      }
+    }
+
+    // ==========================================
+    // OVERLAY ELEMENT LIBRARY
+    // ==========================================
+    function makeLibraryCard(item) {
+      const card = document.createElement('button');
+      card.className = 'library-card text-left';
+      card.dataset.item = JSON.stringify(item);
+      card.innerHTML = `
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <div class="text-xs font-black text-white uppercase tracking-wider">${item.name}</div>
+            <div class="text-[10px] text-gray-400 mt-0.5">${item.type || 'overlay-element'}</div>
+          </div>
+          <i data-lucide="plus-circle" class="w-4 h-4 text-[#00ffd5]"></i>
+        </div>
+      `;
+      card.addEventListener('click', () => addPortalElement(item));
+      card.draggable = true;
+      card.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('application/json', JSON.stringify(item));
+      });
+      return card;
+    }
+
+    async function fetchOverlayTools() {
+      const list = $('fetchedElementsList');
+      list.innerHTML = '<div class="text-[11px] text-gray-400 px-2 py-3">Loading ../OverlayBuilder/OverlayTools.html...</div>';
+      try {
+        const res = await fetch('../OverlayBuilder/OverlayTools.html', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+
+        const candidates = [...doc.querySelectorAll('[data-overlay-tool], [data-tool], .overlay-tool, .tool-card, button, a')]
+          .slice(0, 40)
+          .map((el, i) => {
+            const name = (el.getAttribute('data-name') || el.getAttribute('title') || el.textContent || `Overlay Tool ${i + 1}`).trim().replace(/\s+/g, ' ').slice(0, 44);
+            const type = el.getAttribute('data-type') || el.getAttribute('data-tool') || 'fetched';
+            return {
+              id: `fetched-${i}-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+              name: name || `Overlay Tool ${i + 1}`,
+              type,
+              html: el.outerHTML,
+              w: 260,
+              h: 70,
+              x: 80 + ((i % 3) * 32),
+              y: 160 + ((i % 5) * 42)
+            };
+          })
+          .filter((item, index, arr) => item.name && arr.findIndex(x => x.name === item.name) === index);
+
+        list.innerHTML = '';
+        if (!candidates.length) throw new Error('No usable elements found');
+        candidates.forEach((item) => list.appendChild(makeLibraryCard(item)));
+        lucide.createIcons();
+        showToast(`Loaded ${candidates.length} overlay tools.`);
+      } catch (err) {
+        list.innerHTML = `<div class="text-[11px] leading-relaxed text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">Could not fetch ../OverlayBuilder/OverlayTools.html from this location. Run START_SERVER_8080.bat from the app root. Fallback elements are still available.</div>`;
+      }
+    }
+
+    function renderFallbackLibrary() {
+      const list = $('fallbackElementsList');
+      list.innerHTML = '';
+      BUILT_IN_ELEMENTS.forEach((item) => list.appendChild(makeLibraryCard(item)));
+    }
+
+    function addPortalElement(template) {
+      const element = {
+        ...template,
+        uid: `el-${Date.now()}-${Math.floor(Math.random() * 9999)}`,
+        x: template.x ?? 120,
+        y: template.y ?? 160,
+        w: template.w ?? 240,
+        h: template.h ?? 62,
+      };
+      portalElements.push(element);
+      selectedElementId = element.uid;
+      renderPortalElements();
+      showToast(`Added ${element.name}`);
+    }
+
+    function renderPortalElements() {
+      overlayLayer.innerHTML = '';
+      portalElements.forEach((item) => {
+        const el = document.createElement('div');
+        el.className = 'portal-element';
+        el.dataset.uid = item.uid;
+        el.style.left = `${item.x}px`;
+        el.style.top = `${item.y}px`;
+        el.style.width = `${item.w}px`;
+        el.style.minHeight = `${item.h}px`;
+        el.style.pointerEvents = 'auto';
+        el.style.borderStyle = selectedElementId === item.uid ? 'solid' : 'dashed';
+        el.style.borderColor = selectedElementId === item.uid ? 'var(--accent)' : 'rgba(0,255,213,.55)';
+        el.innerHTML = `<div class="text-[10px] font-black uppercase tracking-widest text-[#00ffd5] mb-1">${item.name}</div><div class="text-xs">${item.html || item.name}</div>`;
+        el.addEventListener('click', (e) => {
+          e.stopPropagation();
+          selectedElementId = item.uid;
+          renderPortalElements();
+        });
+        makeDraggable(el, item);
+        overlayLayer.appendChild(el);
+      });
+      const selected = portalElements.find(x => x.uid === selectedElementId);
+      $('selectedElementLabel').textContent = selected ? selected.name : 'None';
+    }
+
+    function makeDraggable(node, item) {
+      let dragging = false;
+      let startX = 0;
+      let startY = 0;
+      let origX = 0;
+      let origY = 0;
+
+      node.addEventListener('pointerdown', (e) => {
+        dragging = true;
+        selectedElementId = item.uid;
+        startX = e.clientX;
+        startY = e.clientY;
+        origX = item.x;
+        origY = item.y;
+        node.setPointerCapture(e.pointerId);
+        renderPortalElements();
+      });
+
+      node.addEventListener('pointermove', (e) => {
+        if (!dragging) return;
+        item.x = Math.max(0, origX + (e.clientX - startX));
+        item.y = Math.max(0, origY + (e.clientY - startY));
+        node.style.left = `${item.x}px`;
+        node.style.top = `${item.y}px`;
+      });
+
+      node.addEventListener('pointerup', () => { dragging = false; });
+      node.addEventListener('pointercancel', () => { dragging = false; });
+    }
+
+    function nudgeSelected(dx, dy) {
+      const item = portalElements.find(x => x.uid === selectedElementId);
+      if (!item) return;
+      item.x = Math.max(0, item.x + dx);
+      item.y = Math.max(0, item.y + dy);
+      renderPortalElements();
+    }
+
+    // ==========================================
+    // EVENTS
+    // ==========================================
+    loadBtn.addEventListener('click', () => loadStream(channelInput.value));
+    $('applyChannelBtn').addEventListener('click', () => loadStream($('configChannel').value));
+    $('configPlatform')?.addEventListener('change', () => { applyConfig(); loadStream($('configChannel').value); });
+    channelInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadStream(channelInput.value); });
+
+    document.addEventListener('keydown', (e) => {
+      if ([channelInput, $('configChannel'), $('configPlatform'), $('librarySearch')].includes(document.activeElement)) return;
+      if (e.key.toLowerCase() === 't') {
+        toggleChat(false);
+        showToast('Chat panel loaded!');
+        e.preventDefault();
+      }
+      if (e.key === 'Delete' && selectedElementId) {
+        portalElements = portalElements.filter(x => x.uid !== selectedElementId);
+        selectedElementId = null;
+        renderPortalElements();
+      }
+    });
+
+    clickShield.addEventListener('click', () => {
+      if (FLOATING_CHAT_OVERLAY && !chatCollapsed) toggleChat(true);
+    });
+
+    chatToggleBtn.addEventListener('click', () => toggleChat());
+    floatingChatToggleBtn.addEventListener('click', () => toggleChat());
+    chatCloseBtn.addEventListener('click', () => toggleChat(true));
+
+    $('configToggleBtn').addEventListener('click', () => $('rightConfig').classList.toggle('open'));
+    $('libraryToggleBtn').addEventListener('click', () => $('leftLibrary').classList.toggle('open'));
+    $('reloadLibraryBtn').addEventListener('click', fetchOverlayTools);
+
+    $('sendToPortalBtn').addEventListener('click', () => {
+      showToast('Send To Stream Portal button is intentionally non-functional for now.');
+    });
+
+    $('saveConfigBtn').addEventListener('click', () => {
+      localStorage.setItem('streamerViewPortalBuilderConfig', JSON.stringify(serializeConfig()));
+      showToast('Config saved locally.');
+    });
+
+    ['allowCustomLoaderToggle','floatingChatOverlayToggle','configPlatform','configTitle','configChatTitle','accentColor','cyanColor','panelColor','borderColor','chatWidthRange','radiusRange','glowRange','previewScaleRange','scanlineToggle','scanOpacityRange','scanGapRange','scanSpeedRange'].forEach((id) => {
+      $(id).addEventListener('input', applyConfig);
+      $(id).addEventListener('change', applyConfig);
+    });
+
+    $('nudgeLeftBtn').addEventListener('click', () => nudgeSelected(-10, 0));
+    $('nudgeRightBtn').addEventListener('click', () => nudgeSelected(10, 0));
+    $('nudgeUpBtn').addEventListener('click', () => nudgeSelected(0, -10));
+    $('nudgeDownBtn').addEventListener('click', () => nudgeSelected(0, 10));
+    $('deleteElementBtn').addEventListener('click', () => {
+      portalElements = portalElements.filter(x => x.uid !== selectedElementId);
+      selectedElementId = null;
+      renderPortalElements();
+    });
+
+    $('portalPreview').addEventListener('dragover', (e) => e.preventDefault());
+    $('portalPreview').addEventListener('drop', (e) => {
+      e.preventDefault();
+      try {
+        const item = JSON.parse(e.dataTransfer.getData('application/json'));
+        const rect = $('portalPreview').getBoundingClientRect();
+        item.x = Math.round(e.clientX - rect.left);
+        item.y = Math.round(e.clientY - rect.top);
+        addPortalElement(item);
+      } catch {}
+    });
+
+    $('librarySearch').addEventListener('input', () => {
+      const q = $('librarySearch').value.toLowerCase().trim();
+      document.querySelectorAll('.library-card').forEach(card => {
+        card.style.display = card.innerText.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+
+    // ==========================================
+    // INIT
+    // ==========================================
+    window.addEventListener('load', () => {
+      $('configParentDomain').value = window.location.hostname || 'localhost';
+      loadSavedConfig();
+      applyConfig();
+      renderFallbackLibrary();
+      renderPortalElements();
+      fetchOverlayTools();
+      lucide.createIcons();
+      const savedPlatform = localStorage.getItem('selectedStreamPlatform') || $('configPlatform')?.value || 'twitch';
+      if ($('configPlatform')) $('configPlatform').value = savedPlatform === 'youtube' ? 'youtube' : 'twitch';
+      const savedChannel = savedPlatform === 'youtube' ? (localStorage.getItem('selectedYouTubeSource') || $('configChannel').value || 'zJwMfRgk3OE') : (localStorage.getItem('selectedTwitchChannel') || $('configChannel').value || 'technoconqueror');
+      loadStream(savedChannel);
+    });
+  </script>
+
+
+  <script>
+    // ==========================================
+    // BRIDGE / EXPORT / DASHBOARD LAYER
+    // Consolidated app chaining, dashboard metrics, asset import, and static viewer export layer.
+    // ==========================================
+    (function bridgeStreamPortalSuite(){
+      const bridgeState = { dashboardOpen: false, importedAssets: [] };
+      const qs = (id) => document.getElementById(id);
+      const safeSlug = (value, fallback='stream') => String(value || fallback).trim().replace(/[^a-z0-9_ -]/gi,'').replace(/\s+/g,'_').replace(/_+/g,'_').slice(0,64) || fallback;
+      const cleanChannel = (value) => String(value || 'technoconqueror').trim().toLowerCase().replace(/[^a-z0-9_]/g,'') || 'technoconqueror';
+      const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+      const BUILDER_ASSET_LIBRARY_KEY = 'twitchOverlayBuilderAssetsV1';
+      const MANAGER_ASSET_LIBRARY_KEY = 'twitchOverlayManagerLibraryV1';
+      const readJsonStore = (key, fallback = []) => { try { return JSON.parse(localStorage.getItem(key) || JSON.stringify(fallback)); } catch { return fallback; } };
+      const writeJsonStore = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch (err) { console.warn('Local cache write skipped', key, err); } };
+      const readAllCachedAssets = () => {
+        const merged = [...readJsonStore(BUILDER_ASSET_LIBRARY_KEY), ...readJsonStore(MANAGER_ASSET_LIBRARY_KEY)];
+        const seen = new Set();
+        return merged.filter(asset => {
+          const key = asset.id || asset.name;
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      };
+      const cacheManagerAsset = (asset) => {
+        const existing = readJsonStore(MANAGER_ASSET_LIBRARY_KEY);
+        const normalized = { ...asset, id: asset.id || `manager-${Date.now()}-${Math.random().toString(16).slice(2)}`, createdAt: asset.createdAt || new Date().toISOString() };
+        writeJsonStore(MANAGER_ASSET_LIBRARY_KEY, [normalized, ...existing.filter(item => item.name !== normalized.name && item.id !== normalized.id)].slice(0, 120));
+        return normalized;
+      };
+      const assetHtml = (asset) => {
+        const name = escapeHtml(asset.name || 'Imported Asset');
+        if (asset.frames && Array.isArray(asset.frames) && asset.frames.length) {
+          return `<img alt="${name}" src="${asset.frames[0]}" data-frames='${escapeHtml(JSON.stringify(asset.frames))}' data-fps="${asset.fps || 12}" style="width:100%;height:100%;object-fit:contain;display:block;" />`;
+        }
+        if ((asset.mime || '').includes('html') || String(asset.name || '').toLowerCase().endsWith('.html')) {
+          return `<iframe title="${name}" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox" srcdoc="${escapeHtml(asset.text || '')}"></iframe>`;
+        }
+        return `<img alt="${name}" src="${asset.dataUrl}" style="width:100%;height:100%;object-fit:contain;display:block;pointer-events:none;" />`;
+      };
+      const makeAssetItem = (asset, index = 0) => ({
+        id: asset.id || `asset-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+        name: String(asset.name || 'Cached Asset').replace(/\.[^.]+$/,''),
+        type: asset.type || (String(asset.name || '').toLowerCase().endsWith('.html') ? 'output-html' : 'output-png'),
+        html: assetHtml(asset),
+        w: asset.w || (String(asset.name || '').toLowerCase().endsWith('.html') ? 320 : 260),
+        h: asset.h || (String(asset.name || '').toLowerCase().endsWith('.html') ? 100 : 90),
+        x: 96 + ((index % 4) * 24),
+        y: 150 + ((index % 6) * 38),
+        actionType: asset.actionType || 'none',
+        actionValue: asset.actionValue || '',
+        actionNewTab: asset.actionNewTab ?? true,
+        asset
+      });
+      const addCachedAssetsToList = (list) => {
+        const cached = readAllCachedAssets();
+        cached.forEach((asset, i) => list.appendChild(makeLibraryCard(makeAssetItem(asset, i))));
+        return cached.length;
+      };
+
+      const oldFetchOverlayTools = typeof fetchOverlayTools === 'function' ? fetchOverlayTools : null;
+      fetchOverlayTools = async function bridgedFetchOverlayTools(){
+        const list = qs('fetchedElementsList');
+        if (!list) return oldFetchOverlayTools && oldFetchOverlayTools();
+        list.innerHTML = '';
+        const cachedCount = addCachedAssetsToList(list);
+        const loadingNote = document.createElement('div');
+        loadingNote.className = 'text-[11px] text-gray-400 px-2 py-3';
+        loadingNote.textContent = cachedCount ? `Loaded ${cachedCount} cached PNG/HTML asset(s). Checking OverlayBuilder controls...` : 'Loading ../OverlayBuilder/OverlayTools.html...';
+        list.appendChild(loadingNote);
+        const paths = ['../OverlayBuilder/OverlayTools.html','OverlayBuilder/OverlayTools.html'];
+        let lastErr = null;
+        for (const path of paths) {
+          try {
+            const res = await fetch(path, { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const html = await res.text();
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const candidates = [...doc.querySelectorAll('[data-overlay-tool], [data-tool], .overlay-tool, .tool-card, button, a')]
+              .filter(el => (el.textContent || '').trim().length > 1)
+              .slice(0, 60)
+              .map((el, i) => {
+                const name = (el.getAttribute('data-name') || el.getAttribute('title') || el.textContent || `Overlay Tool ${i + 1}`).trim().replace(/\s+/g, ' ').slice(0, 44);
+                const type = el.getAttribute('data-type') || el.getAttribute('data-tool') || 'builder-tool';
+                return { id:`builder-${i}-${safeSlug(name,'tool')}`, name, type, html:el.outerHTML, w:260, h:70, x:80+((i%3)*32), y:160+((i%5)*42) };
+              })
+              .filter((item, index, arr) => item.name && arr.findIndex(x => x.name === item.name) === index);
+            list.innerHTML = '';
+            const cachedCount2 = addCachedAssetsToList(list);
+            if (!candidates.length && !cachedCount2) throw new Error('No usable elements found');
+            candidates.forEach((item) => list.appendChild(makeLibraryCard(item)));
+            if (window.lucide) lucide.createIcons();
+            showToast(`Loaded ${candidates.length} Overlay Builder controls.`);
+            return;
+          } catch (err) { lastErr = err; }
+        }
+        list.innerHTML = `<div class="text-[11px] leading-relaxed text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl p-3">Could not fetch ../OverlayBuilder/OverlayTools.html. Run through START_SERVER_8080.bat instead of opening as a raw file. Fallback elements are still available.</div>`;
+        console.warn('OverlayBuilder fetch failed', lastErr);
+      };
+
+      function getBridgeConfig(){
+        const base = typeof serializeConfig === 'function' ? serializeConfig() : {};
+        return {
+          ...base,
+          gameName: qs('configGameName')?.value || '',
+          profileName: qs('configProfileName')?.value || '',
+          dashboardEnabled: qs('dashboardEnabledToggle')?.checked ?? true,
+          platform: base.platform || getPlatform(),
+          dashboardChannel: cleanChannel(qs('dashboardChannelInput')?.value || base.channel || 'technoconqueror'),
+          importedAssets: bridgeState.importedAssets,
+          cachedAssets: readAllCachedAssets()
+        };
+      }
+
+      function dashboardUrl(channel){
+        return `https://twitchtracker.com/${encodeURIComponent(cleanChannel(channel))}`;
+      }
+
+      function applyDashboard(){
+        const channel = cleanChannel(qs('dashboardChannelInput')?.value || qs('configChannel')?.value || 'technoconqueror');
+        const iframe = qs('dashboardMetricsFrame');
+        const label = qs('dashboardMetricsLabel');
+        const external = qs('dashboardExternalLink');
+        if (iframe && iframe.src !== dashboardUrl(channel)) iframe.src = dashboardUrl(channel);
+        if (label) label.textContent = `TWITCHTRACKER / ${channel}`;
+        if (external) external.href = dashboardUrl(channel);
+      }
+
+      function toggleDashboard(force){
+        bridgeState.dashboardOpen = typeof force === 'boolean' ? force : !bridgeState.dashboardOpen;
+        const panel = qs('dashboardMetricsPanel');
+        if (!panel) return;
+        applyDashboard();
+        panel.classList.toggle('hidden', !bridgeState.dashboardOpen);
+        showToast(bridgeState.dashboardOpen ? 'Dashboard metrics opened.' : 'Dashboard metrics closed.');
+      }
+
+      function injectBridgeUI(){
+        if (qs('configGameName')) return;
+
+        const toolbarRight = qs('sendToPortalBtn')?.parentElement;
+        if (toolbarRight) {
+          const metricsBtn = document.createElement('button');
+          metricsBtn.id = 'metricsDashboardBtn';
+          metricsBtn.className = 'pointer-events-auto bg-[#00ffd5]/10 hover:bg-[#00ffd5]/20 border border-[#00ffd5]/40 text-[#00ffd5] text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-xl transition active:scale-95 flex items-center gap-2';
+          metricsBtn.innerHTML = '<i data-lucide="bar-chart-3" class="w-4 h-4"></i> Dashboard Metrics';
+          metricsBtn.addEventListener('click', () => toggleDashboard());
+          toolbarRight.insertBefore(metricsBtn, qs('sendToPortalBtn'));
+
+          const oldSend = qs('sendToPortalBtn');
+          const clone = oldSend.cloneNode(true);
+          clone.id = 'createStreamClientBtn';
+          clone.innerHTML = '<i data-lucide="package-plus" class="w-4 h-4"></i> Create Stream / Export Client ZIP';
+          oldSend.replaceWith(clone);
+          clone.addEventListener('click', exportClientZip);
+        }
+
+        const videoContainer = qs('videoContainer');
+        if (videoContainer && !qs('dashboardMetricsPanel')) {
+          const panel = document.createElement('section');
+          panel.id = 'dashboardMetricsPanel';
+          panel.className = 'metrics-panel hidden';
+          panel.innerHTML = `
+            <div class="metrics-head">
+              <span id="dashboardMetricsLabel">TWITCHTRACKER / technoconqueror</span>
+              <div class="metrics-actions">
+                <a id="dashboardExternalLink" href="https://twitchtracker.com/technoconqueror" target="_blank" rel="noopener">Open</a>
+                <button id="dashboardCloseBtn" type="button">Close</button>
+              </div>
+            </div>
+            <iframe id="dashboardMetricsFrame" title="TwitchTracker Metrics Dashboard" src="https://twitchtracker.com/technoconqueror" referrerpolicy="no-referrer-when-downgrade"></iframe>`;
+          videoContainer.appendChild(panel);
+          qs('dashboardCloseBtn').addEventListener('click', () => toggleDashboard(false));
+        }
+
+        const rightConfig = qs('rightConfig');
+        const firstDetails = rightConfig?.querySelector('details');
+        if (rightConfig && firstDetails) {
+          const profileDetails = document.createElement('details');
+          profileDetails.open = true;
+          profileDetails.className = 'glass-panel rounded-2xl p-4';
+          profileDetails.innerHTML = `
+            <summary class="flex items-center justify-between cursor-pointer">
+              <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">0. Stream Profile / Output</span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+            </summary>
+            <div class="mt-4 space-y-3">
+              <div><label class="config-label">Required Game Name</label><input id="configGameName" class="config-input" value="VoidTrain" placeholder="Example: VoidTrain, AsterBlaster, Speedverse" /></div>
+              <div><label class="config-label">Profile / Scene Name</label><input id="configProfileName" class="config-input" value="Main_Stream" placeholder="Example: Main_Stream" /></div>
+              <div class="text-[11px] text-gray-400 leading-relaxed">Output target: baked downloadable <span class="text-[#00ffd5] font-bold">&lt;Streamer&gt;_StreamClient</span> ZIP. Client contains only root <span class="text-[#00ffd5] font-bold">index.html</span> and <span class="text-[#00ffd5] font-bold">viewer/index.html</span>.</div>
+              <button id="createStreamConfigBtn" class="w-full bg-[#9146FF] hover:bg-[#772ce8] text-white text-xs font-black uppercase tracking-widest px-4 py-2.5 rounded-xl transition">Create Stream Profile + Client ZIP</button>
+            </div>`;
+          rightConfig.insertBefore(profileDetails, firstDetails);
+
+          const dashDetails = document.createElement('details');
+          dashDetails.open = true;
+          dashDetails.className = 'glass-panel rounded-2xl p-4';
+          dashDetails.innerHTML = `
+            <summary class="flex items-center justify-between cursor-pointer">
+              <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">7. Dashboard Metrics</span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+            </summary>
+            <div class="mt-4 space-y-3">
+              <label class="flex items-center justify-between gap-3 bg-[#1b1b2f]/70 border border-[#31314f] rounded-xl px-3 py-2">
+                <span class="text-xs font-bold text-gray-200">Include Metrics Dashboard Button</span>
+                <input id="dashboardEnabledToggle" type="checkbox" checked class="accent-[#9146FF] w-5 h-5" />
+              </label>
+              <div><label class="config-label">Twitch Name For Metrics</label><input id="dashboardChannelInput" class="config-input" value="technoconqueror" placeholder="technoconqueror" /></div>
+              <button id="applyDashboardBtn" class="w-full bg-[#00ffd5]/10 border border-[#00ffd5]/40 text-[#00ffd5] px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#00ffd5]/20 transition">Apply / Toggle Dashboard</button>
+            </div>`;
+          rightConfig.appendChild(dashDetails);
+
+          const assetDetails = document.createElement('details');
+          assetDetails.open = true;
+          assetDetails.className = 'glass-panel rounded-2xl p-4';
+          assetDetails.innerHTML = `
+            <summary class="flex items-center justify-between cursor-pointer">
+              <span class="text-xs font-black uppercase tracking-widest text-[#00ffd5]">8. Load Exported Builder Assets</span>
+              <i data-lucide="chevron-down" class="w-4 h-4 text-gray-400"></i>
+            </summary>
+            <div class="mt-4 space-y-3">
+              <div class="asset-import-card text-[11px] text-gray-300 leading-relaxed">Select PNG, PNG frameset ZIP, or self-contained HTML exported from Overlay Builder. Cached exports also auto-appear here after refresh through localStorage.</div>
+              <input id="outputAssetPicker" type="file" multiple accept="image/png,text/html,.html,.png,.zip,application/zip" class="config-input" />
+              <div id="outputAssetCount" class="text-[11px] text-gray-400">No output assets loaded yet.</div>
+            </div>`;
+          rightConfig.appendChild(assetDetails);
+        }
+
+        const selectedPanel = qs('deleteElementBtn')?.parentElement;
+        if (selectedPanel && !qs('selectedActionType')) {
+          const actionCard = document.createElement('div');
+          actionCard.className = 'action-editor-card space-y-2';
+          actionCard.innerHTML = `
+            <div class="text-[10px] font-black uppercase tracking-widest text-[#00ffd5]">Button / Element Action</div>
+            <select id="selectedActionType" class="config-input">
+              <option value="none">None / visual only</option>
+              <option value="href">URL / href open</option>
+              <option value="redirect">Redirect current page</option>
+              <option value="sound">Play sound URL</option>
+              <option value="invite">Invite link</option>
+              <option value="donation">Donation link</option>
+            </select>
+            <input id="selectedActionValue" class="config-input" placeholder="https://discord.gg/... / https://cash.app/... / sound.mp3" />
+            <label class="flex items-center justify-between gap-3 text-[11px] text-gray-300"><span>Open URL actions in new tab</span><input id="selectedActionNewTab" type="checkbox" checked class="accent-[#9146FF]" /></label>
+            <button id="applySelectedActionBtn" class="w-full bg-[#00ffd5]/10 border border-[#00ffd5]/40 text-[#00ffd5] px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-[#00ffd5]/20 transition">Apply Action To Selected</button>
+          `;
+          selectedPanel.insertBefore(actionCard, qs('deleteElementBtn'));
+        }
+
+        qs('createStreamConfigBtn')?.addEventListener('click', exportClientZip);
+        qs('applyDashboardBtn')?.addEventListener('click', () => toggleDashboard());
+        qs('dashboardChannelInput')?.addEventListener('input', applyDashboard);
+        qs('configChannel')?.addEventListener('input', () => { if (qs('dashboardChannelInput')) qs('dashboardChannelInput').value = cleanChannel(qs('configChannel').value); });
+        qs('outputAssetPicker')?.addEventListener('change', importOutputAssets);
+        qs('applySelectedActionBtn')?.addEventListener('click', applySelectedActionFromPanel);
+        qs('portalPreview')?.addEventListener('pointerup', persistBridgeConfig, true);
+        ['selectedActionType','selectedActionValue','selectedActionNewTab','configGameName','configProfileName','dashboardEnabledToggle','dashboardChannelInput'].forEach(id => {
+          qs(id)?.addEventListener('input', persistBridgeConfig);
+          qs(id)?.addEventListener('change', persistBridgeConfig);
+        });
+        window.addEventListener('storage', (event) => { if (event.key === BUILDER_ASSET_LIBRARY_KEY) fetchOverlayTools(); });
+        if (window.lucide) lucide.createIcons();
+      }
+
+      async function importOutputAssets(event){
+        const files = [...(event.target.files || [])];
+        if (!files.length) return;
+        let loaded = 0;
+        for (const file of files) {
+          try {
+            const lower = file.name.toLowerCase();
+            let asset = null;
+            if (lower.endsWith('.zip')) {
+              if (!window.JSZip) throw new Error('JSZip unavailable');
+              const zip = await JSZip.loadAsync(await file.arrayBuffer());
+              const manifestFile = zip.file('manifest.json');
+              let manifest = { fps: 12 };
+              if (manifestFile) {
+                try { manifest = JSON.parse(await manifestFile.async('text')); } catch {}
+              }
+              const pngFiles = Object.keys(zip.files).filter(name => name.toLowerCase().endsWith('.png')).sort();
+              const frames = [];
+              for (const name of pngFiles.slice(0, 160)) {
+                const b64 = await zip.file(name).async('base64');
+                frames.push(`data:image/png;base64,${b64}`);
+              }
+              if (!frames.length) throw new Error('No PNG frames found in ZIP');
+              asset = { name:file.name, type:'output-png-frameset', mime:'application/zip', frames, fps:manifest.fps || 12, w:320, h:100 };
+            } else {
+              const isText = file.type.includes('html') || lower.endsWith('.html');
+              const data = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                if (isText) reader.readAsText(file); else reader.readAsDataURL(file);
+              });
+              asset = { name:file.name, mime:file.type || (isText ? 'text/html' : 'image/png'), dataUrl:isText ? '' : data, text:isText ? String(data || '') : '', type: isText ? 'output-html' : 'output-png' };
+            }
+            const cached = cacheManagerAsset(asset);
+            bridgeState.importedAssets.push(cached);
+            const item = makeAssetItem(cached, bridgeState.importedAssets.length);
+            const list = qs('fallbackElementsList');
+            if (list && typeof makeLibraryCard === 'function') list.prepend(makeLibraryCard(item));
+            loaded++;
+            if (qs('outputAssetCount')) qs('outputAssetCount').textContent = `${readAllCachedAssets().length} cached/imported asset(s) available. PNG/HTML/frameset only.`;
+          } catch (err) {
+            console.warn('Asset import failed', file.name, err);
+            showToast(`Could not import ${file.name}`);
+          }
+        }
+        if (loaded) { showToast(`Loaded ${loaded} output asset(s).`); if (window.lucide) lucide.createIcons(); persistBridgeConfig(); }
+      }
+
+      function getSelectedPortalElement(){
+        try { return portalElements.find(x => x.uid === selectedElementId) || null; } catch { return null; }
+      }
+
+      function updateSelectedActionPanel(){
+        const item = getSelectedPortalElement();
+        const type = qs('selectedActionType');
+        const value = qs('selectedActionValue');
+        const newTab = qs('selectedActionNewTab');
+        if (!type || !value || !newTab) return;
+        type.value = item?.actionType || 'none';
+        value.value = item?.actionValue || '';
+        newTab.checked = item?.actionNewTab ?? true;
+      }
+
+      function applySelectedActionFromPanel(){
+        const item = getSelectedPortalElement();
+        if (!item) { showToast('Select an element before assigning an action.'); return; }
+        item.actionType = qs('selectedActionType')?.value || 'none';
+        item.actionValue = qs('selectedActionValue')?.value || '';
+        item.actionNewTab = qs('selectedActionNewTab')?.checked ?? true;
+        renderPortalElements();
+        persistBridgeConfig();
+        showToast(`Action saved: ${item.actionType}`);
+      }
+
+      function persistBridgeConfig(){
+        try { localStorage.setItem('streamerViewPortalBuilderConfig', JSON.stringify(getBridgeConfig())); } catch (err) { console.warn('Manager autosave skipped', err); }
+      }
+
+      const baseRenderPortalElements = typeof renderPortalElements === 'function' ? renderPortalElements : null;
+      if (baseRenderPortalElements) {
+        renderPortalElements = function bridgedRenderPortalElements(){
+          baseRenderPortalElements();
+          document.querySelectorAll('.portal-element').forEach(node => {
+            const uid = node.dataset.uid;
+            const item = portalElements.find(x => x.uid === uid);
+            if (!item) return;
+            node.dataset.actionType = item.actionType || 'none';
+            node.dataset.actionValue = item.actionValue || '';
+            node.dataset.actionNewTab = String(item.actionNewTab ?? true);
+            if ((item.actionType || 'none') !== 'none' && !node.querySelector('.action-badge')) {
+              const badge = document.createElement('span');
+              badge.className = 'action-badge';
+              badge.textContent = item.actionType;
+              node.appendChild(badge);
+            }
+          });
+          updateSelectedActionPanel();
+          persistBridgeConfig();
+        };
+      }
+
+      function validateProfile(c){
+        const game = qs('configGameName');
+        const profile = qs('configProfileName');
+        [game, profile].forEach(el => el?.classList.remove('profile-required'));
+        if (!String(c.gameName || '').trim()) { game?.classList.add('profile-required'); showToast('Define a required game name before creating the stream.'); return false; }
+        if (!String(c.profileName || '').trim()) { profile?.classList.add('profile-required'); showToast('Define a profile / scene name before creating the stream.'); return false; }
+        return true;
+      }
+
+      function buildViewerHtml(config){
+        const cfg = JSON.stringify(config).replace(/</g,'\u003c');
+        return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Baked static Twitch stream viewer generated by Twitch Overlay Stream Manager." />
+  <meta name="theme-color" content="${escapeHtml(config.accent || '#9146ff')}" />
+  <meta property="og:title" content="${escapeHtml(config.title || 'Stream Portal')}" />
+  <meta property="og:description" content="${escapeHtml(config.gameName || 'Game')} stream viewer." />
+  <meta property="og:type" content="website" />
+  <title>${escapeHtml(config.title || 'Stream Portal')}</title>
+  <style>
+    :root{--accent:${config.accent || '#9146ff'};--cyan:${config.cyan || '#00ffd5'};--panel:${config.panel || '#121222'};--border:${config.border || '#31314f'};--chat-width:${config.chatWidth || 400}px;--radius:${config.radius || 18}px;--glow:${config.glow || 18}px;--scan-opacity:${config.scanlines ? ((Number(config.scanOpacity)||18)/100) : 0};--scan-gap:${config.scanGap || 7}px;--scan-speed:${config.scanSpeed || 8}s;}
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#05050a;color:#eaffff;font-family:Inter,Segoe UI,Arial,sans-serif;overflow:hidden}.app{position:fixed;inset:0;background:#000}.video-wrap{position:absolute;inset:0;background:#000;overflow:hidden}.video-wrap:after{content:"";position:absolute;inset:0;pointer-events:none;opacity:var(--scan-opacity);background-image:repeating-linear-gradient(0deg,transparent 0,transparent var(--scan-gap),rgba(0,255,213,.55) calc(var(--scan-gap) + 1px),transparent calc(var(--scan-gap) + 2px));animation:scan var(--scan-speed) linear infinite;mix-blend-mode:screen;z-index:22}@keyframes scan{to{background-position-y:32px}}iframe{border:0}.stream-frame{position:absolute;inset:0;width:100%;height:100%;z-index:1}.viewer-hud{position:absolute;left:16px;top:16px;z-index:45;display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid color-mix(in srgb,var(--cyan),transparent 58%);border-radius:var(--radius);background:rgba(5,5,10,.62);backdrop-filter:blur(14px);box-shadow:0 0 var(--glow) rgba(0,255,213,.18)}.viewer-hud strong{font-size:13px;letter-spacing:.08em;text-transform:uppercase}.viewer-hud small{display:block;color:#9fb1bd;font-size:11px}.live-dot{width:9px;height:9px;background:#ef4444;border-radius:99px;box-shadow:0 0 0 0 rgba(239,68,68,.7);animation:pulse 1.6s infinite}@keyframes pulse{to{box-shadow:0 0 0 8px rgba(239,68,68,0)}}.overlay-layer{position:absolute;inset:0;z-index:30;pointer-events:none}.portal-element{position:absolute;pointer-events:auto;color:white;border-radius:14px;overflow:visible;filter:drop-shadow(0 0 var(--glow) rgba(0,255,213,.18));}.portal-element .label{display:none}.portal-element .content,.portal-element iframe,.portal-element img{width:100%;height:100%;display:block;border:0}.portal-element iframe{background:transparent}.portal-element img{object-fit:contain}.portal-element[data-has-action="true"]:after{content:"";position:absolute;inset:0;z-index:8;cursor:pointer}.chat-dock{position:absolute;right:0;top:0;height:100%;width:var(--chat-width);z-index:40;background:rgba(14,14,26,.96);border-left:1px solid var(--border);box-shadow:-30px 0 90px rgba(0,0,0,.55);transition:.28s ease;display:flex;flex-direction:column;border-radius:var(--radius) 0 0 var(--radius);overflow:hidden}.chat-dock.closed{transform:translateX(100%);opacity:0;pointer-events:none}.chat-head{height:44px;display:flex;align-items:center;justify-content:space-between;padding:0 12px;background:var(--panel);border-bottom:1px solid var(--border);font-size:12px;font-weight:900}.chat-body{position:relative;flex:1}.chat-body iframe{position:absolute;inset:0;width:100%;height:100%}.float-actions{position:absolute;right:16px;top:16px;z-index:60;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}.float-actions button,.float-actions a{border:1px solid rgba(0,255,213,.35);background:rgba(18,18,34,.84);color:#eaffff;border-radius:14px;padding:10px 12px;font-size:12px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;text-decoration:none;backdrop-filter:blur(14px);box-shadow:0 0 var(--glow) rgba(0,255,213,.12);cursor:pointer}.metrics-panel{position:absolute;right:18px;bottom:18px;width:min(780px,calc(100vw - 36px));height:min(560px,calc(100vh - 120px));z-index:55;border:1px solid rgba(0,255,213,.35);border-radius:var(--radius);background:rgba(7,7,11,.9);box-shadow:0 0 40px rgba(0,255,213,.16),0 30px 90px rgba(0,0,0,.55);overflow:hidden;backdrop-filter:blur(16px)}.metrics-panel.hidden{display:none}.metrics-head{height:44px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 12px;background:rgba(18,18,34,.96);border-bottom:1px solid var(--border);font-size:12px;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.metrics-head a,.metrics-head button{border:1px solid rgba(0,255,213,.35);background:rgba(0,255,213,.08);color:#eaffff;border-radius:10px;padding:6px 9px;font-size:11px;font-weight:900;text-decoration:none;cursor:pointer}.metrics-panel iframe{width:100%;height:calc(100% - 44px);background:#05050a}.toast{position:absolute;right:18px;bottom:18px;z-index:90;background:rgba(18,18,34,.95);border:1px solid rgba(0,255,213,.35);border-radius:14px;padding:10px 12px;font-size:12px;color:#eaffff;opacity:0;transform:translateY(8px);transition:.25s ease}.toast.show{opacity:1;transform:translateY(0)}@media(max-width:820px){.chat-dock{width:min(92vw,var(--chat-width))}.viewer-hud{display:none}.float-actions{left:12px;right:12px;top:12px}.float-actions button,.float-actions a{flex:1;padding:9px 8px;font-size:10px}.metrics-panel{height:min(520px,calc(100vh - 100px));right:10px;bottom:10px;width:calc(100vw - 20px)}}
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="video-wrap">
+      <iframe id="streamFrame" class="stream-frame" allowfullscreen allow="autoplay; fullscreen"></iframe>
+      <div class="viewer-hud"><span class="live-dot"></span><div><strong>${escapeHtml(config.title || 'Stream Portal')}</strong><small id="channelLabel">${escapeHtml(config.channel || 'technoconqueror')}</small></div></div>
+      <div id="overlayLayer" class="overlay-layer"></div>
+    </div>
+    <div class="float-actions">
+      ${config.dashboardEnabled ? '<button id="metricsToggle" type="button">Dashboard Metrics</button>' : ''}
+      <button id="chatToggle" type="button">Toggle Chat</button>
+    </div>
+    <aside id="chatDock" class="chat-dock">
+      <div class="chat-head"><span>${escapeHtml(config.chatTitle || 'Live Chat')}</span><button id="chatClose" type="button">Close</button></div>
+      <div class="chat-body"><iframe id="chatFrame"></iframe></div>
+    </aside>
+    <section id="metricsPanel" class="metrics-panel hidden">
+      <div class="metrics-head"><span id="metricsLabel">TWITCHTRACKER</span><span><a id="metricsExternal" target="_blank" rel="noopener">Open</a> <button id="metricsClose" type="button">Close</button></span></div>
+      <iframe id="metricsFrame" title="TwitchTracker Metrics Dashboard" referrerpolicy="no-referrer-when-downgrade"></iframe>
+    </section>
+    <div id="toast" class="toast"></div>
+  </div>
+  <script id="streamConfig" type="application/json">${cfg}<\/script>
+  <script>
+    const CONFIG = JSON.parse(document.getElementById('streamConfig').textContent);
+    const $ = id => document.getElementById(id);
+    let chatClosed = false;
+    let metricsOpen = false;
+    function cleanChannel(v){return String(v||'technoconqueror').trim().toLowerCase().replace(/[^a-z0-9_]/g,'') || 'technoconqueror'}
+    function platform(){return (CONFIG.platform || 'twitch') === 'youtube' ? 'youtube' : 'twitch'}
+    function parentDomain(){return (CONFIG.parentDomain && CONFIG.parentDomain !== 'auto' && CONFIG.parentDomain !== 'localhost') ? CONFIG.parentDomain : (location.hostname || 'localhost')}
+    function parseYouTubeSource(v){const raw=String(v||'').trim();const patterns=[/[?&]v=([A-Za-z0-9_-]{6,})/,/youtu\.be\/([A-Za-z0-9_-]{6,})/,/\/embed\/([A-Za-z0-9_-]{6,})/,/\/live\/([A-Za-z0-9_-]{6,})/,/\/shorts\/([A-Za-z0-9_-]{6,})/];for(const p of patterns){const m=raw.match(p);if(m)return m[1];}return raw.replace(/[^A-Za-z0-9_-]/g,'')}
+    function twitchTrackerUrl(){return 'https://twitchtracker.com/' + encodeURIComponent(cleanChannel(CONFIG.dashboardChannel || CONFIG.channel))}
+    function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2400)}
+    function loadStream(){if(platform()==='youtube'){const id=parseYouTubeSource(CONFIG.channel);$('streamFrame').src='https://www.youtube.com/embed/'+encodeURIComponent(id)+'?autoplay=1&mute=0&playsinline=1&rel=0&enablejsapi=1';$('chatFrame').src='https://www.youtube.com/live_chat?v='+encodeURIComponent(id)+'&embed_domain='+encodeURIComponent(parentDomain());$('channelLabel').textContent='YouTube: '+id;return;}const channel=cleanChannel(CONFIG.channel);$('streamFrame').src='https://player.twitch.tv/?channel='+channel+'&parent='+parentDomain()+'&autoplay=true&muted=false';$('chatFrame').src='https://www.twitch.tv/embed/'+channel+'/chat?parent='+parentDomain()+'&darkpopout';$('channelLabel').textContent='Twitch: '+channel;}
+    function runAction(item){const type=item.actionType||'none';const value=String(item.actionValue||'').trim();if(type==='none'||!value)return;if(type==='sound'){try{new Audio(value).play().catch(()=>toast('Sound blocked until user interacts.'));}catch{toast('Sound action failed.')}return;}if(type==='redirect'){location.href=value;return;}window.open(value, item.actionNewTab===false?'_self':'_blank','noopener');}
+    function renderElements(){const layer=$('overlayLayer');layer.innerHTML='';(CONFIG.elements||[]).forEach((item,index)=>{const el=document.createElement('div');el.className='portal-element';el.style.left=(item.x||0)+'px';el.style.top=(item.y||0)+'px';el.style.width=(item.w||240)+'px';el.style.height=(item.h||60)+'px';el.dataset.hasAction=((item.actionType||'none')!=='none'&&!!item.actionValue);el.innerHTML='<div class="label">'+(item.name||'Element')+'</div><div class="content">'+(item.html||item.name||'')+'</div>';el.addEventListener('click',()=>runAction(item));layer.appendChild(el);});animateFramesets();}
+    function animateFramesets(){document.querySelectorAll('[data-frames]').forEach(img=>{try{const frames=JSON.parse(img.getAttribute('data-frames')||'[]');const fps=Number(img.getAttribute('data-fps')||12);if(frames.length<2||img.dataset.animating)return;img.dataset.animating='1';let i=0;setInterval(()=>{i=(i+1)%frames.length;img.src=frames[i];},Math.max(33,1000/fps));}catch{}})}
+    function toggleChat(force){chatClosed=typeof force==='boolean'?force:!chatClosed;$('chatDock').classList.toggle('closed',chatClosed);toast(chatClosed?'Chat hidden.':'Chat shown.');}
+    function applyMetrics(){const url=twitchTrackerUrl();$('metricsFrame').src=url;$('metricsExternal').href=url;$('metricsLabel').textContent='TWITCHTRACKER / '+cleanChannel(CONFIG.dashboardChannel || CONFIG.channel)}
+    function toggleMetrics(force){metricsOpen=typeof force==='boolean'?force:!metricsOpen;applyMetrics();$('metricsPanel').classList.toggle('hidden',!metricsOpen);toast(metricsOpen?'Dashboard metrics opened.':'Dashboard metrics closed.');}
+    window.addEventListener('message',event=>{if(event.data&&event.data.type==='overlay-element-click'){toast('Overlay element clicked.')}});
+    $('chatToggle').addEventListener('click',()=>toggleChat());$('chatClose').addEventListener('click',()=>toggleChat(true));$('metricsToggle')?.addEventListener('click',()=>toggleMetrics());$('metricsClose')?.addEventListener('click',()=>toggleMetrics(false));document.addEventListener('keydown',e=>{if(e.key.toLowerCase()==='t')toggleChat(false);if(e.key.toLowerCase()==='d')toggleMetrics();});
+    loadStream();renderElements();applyMetrics();
+  <\/script>
+</body>
+</html>`;
+      }
+
+      function buildClientLoaderHtml(config){
+        return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="description" content="${escapeHtml(config.title || 'Stream Client')} viewer entry." />
+  <meta name="theme-color" content="${escapeHtml(config.accent || '#9146ff')}" />
+  <meta property="og:title" content="${escapeHtml(config.title || 'Stream Client')}" />
+  <meta property="og:description" content="Static stream viewer for ${escapeHtml(config.channel || 'streamer')}." />
+  <title>${escapeHtml(config.title || 'Stream Client')}</title>
+  <style>*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#02040a;color:#eaffff;overflow:hidden;font-family:Segoe UI,Arial,sans-serif}.loader{position:fixed;inset:0;display:grid;place-items:center;background:radial-gradient(circle at 50% 40%,rgba(0,255,213,.18),transparent 30%),#02040a;z-index:5;transition:opacity .8s ease}.loader.hide{opacity:0;pointer-events:none}.loader-card{border:1px solid rgba(0,255,213,.35);background:rgba(18,18,34,.86);border-radius:24px;padding:22px 26px;text-align:center;box-shadow:0 0 42px rgba(0,255,213,.14)}.ring{width:42px;height:42px;margin:0 auto 12px;border:3px solid rgba(0,255,213,.18);border-top-color:#00ffd5;border-radius:999px;animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#000;opacity:0;transition:opacity .8s ease}iframe.ready{opacity:1}</style>
+</head>
+<body>
+  <iframe id="viewer" src="viewer/index.html" allowfullscreen allow="autoplay; fullscreen"></iframe>
+  <div id="loader" class="loader"><div class="loader-card"><div class="ring"></div><strong>${escapeHtml(config.title || 'Stream Client')}</strong><br><small>Loading baked viewer...</small></div></div>
+  <script>const f=document.getElementById('viewer'),l=document.getElementById('loader');f.addEventListener('load',()=>{requestAnimationFrame(()=>{f.classList.add('ready');l.classList.add('hide');setTimeout(()=>l.remove(),900);});});setTimeout(()=>{f.classList.add('ready');l.classList.add('hide');},2500);<\/script>
+</body>
+</html>`;
+      }
+
+      async function exportClientZip(){
+        const c = getBridgeConfig();
+        if (!validateProfile(c)) return;
+        c.platform = (c.platform || getPlatform()) === 'youtube' ? 'youtube' : 'twitch';
+        c.channel = c.platform === 'youtube' ? parseYouTubeSource(c.channel || qs('configChannel')?.value || 'zJwMfRgk3OE').id : cleanChannel(c.channel || qs('configChannel')?.value || 'technoconqueror');
+        c.dashboardChannel = cleanChannel(c.dashboardChannel || c.channel);
+        c.parentDomain = c.parentDomain || 'auto';
+        c.createdAt = new Date().toISOString();
+        c.elements = Array.isArray(c.elements) ? c.elements.map(item => ({ ...item, asset: undefined })) : [];
+        persistBridgeConfig();
+        if (!window.JSZip) { showToast('JSZip failed to load. Check internet/CDN access, then try again.'); return; }
+        const streamer = safeSlug(c.channel || 'Streamer', 'Streamer');
+        const root = `${streamer}_StreamClient`;
+        const zip = new JSZip();
+        const viewerHtml = buildViewerHtml(c);
+        const loaderHtml = buildClientLoaderHtml(c);
+        zip.file(`${root}/index.html`, loaderHtml);
+        zip.file(`${root}/viewer/index.html`, viewerHtml);
+        const blob = await zip.generateAsync({type:'blob'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `${root}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        showToast(`Exported stripped ${root}.zip`);
+      }
+
+      function loadBridgeSavedConfig(){
+        try {
+          const raw = localStorage.getItem('streamerViewPortalBuilderConfig');
+          if (!raw) return;
+          const c = JSON.parse(raw);
+          if (qs('configGameName')) qs('configGameName').value = c.gameName || qs('configGameName').value || 'VoidTrain';
+          if (qs('configProfileName')) qs('configProfileName').value = c.profileName || qs('configProfileName').value || 'Main_Stream';
+          if (qs('dashboardEnabledToggle')) qs('dashboardEnabledToggle').checked = c.dashboardEnabled ?? true;
+          if (qs('dashboardChannelInput')) qs('dashboardChannelInput').value = cleanChannel(c.dashboardChannel || c.channel || 'technoconqueror');
+          bridgeState.importedAssets = Array.isArray(c.importedAssets) ? c.importedAssets : [];
+          if (qs('outputAssetCount')) qs('outputAssetCount').textContent = `${readAllCachedAssets().length} cached/imported asset(s) available. PNG/HTML/frameset only.`;
+        } catch(err) { console.warn('Bridge saved config failed', err); }
+      }
+
+      window.addEventListener('load', () => {
+        injectBridgeUI();
+        loadBridgeSavedConfig();
+        applyDashboard();
+      });
+    })();
+  </script>
+
+</body>
+</html>

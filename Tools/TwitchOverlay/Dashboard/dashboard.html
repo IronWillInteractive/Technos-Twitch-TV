@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="TwitchTracker metrics dashboard iframe launcher for stream profiles." />
+  <meta name="theme-color" content="#00ffd5" />
+  <title>Dashboard Metrics</title>
+  <style>
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;background:#05050a;color:#eaffff;font-family:Segoe UI,Arial,sans-serif;overflow:hidden}.shell{height:100%;display:grid;grid-template-rows:auto 1fr;background:radial-gradient(circle at 15% 0,rgba(0,255,213,.14),transparent 32%),linear-gradient(135deg,#05050a,#0d1020)}header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;border-bottom:1px solid rgba(0,255,213,.25);background:rgba(5,5,10,.82);backdrop-filter:blur(16px)}h1{margin:0;font-size:16px;letter-spacing:.08em;text-transform:uppercase}.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}input{background:#121222;border:1px solid #31314f;color:#eaffff;border-radius:12px;padding:10px 12px;min-width:240px;outline:none}button,a{border:1px solid rgba(0,255,213,.4);background:rgba(0,255,213,.1);color:#eaffff;border-radius:12px;padding:10px 12px;font-weight:900;text-decoration:none;cursor:pointer}.frameWrap{position:relative;min-height:0}iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#05050a}.note{font-size:11px;color:#9fb1bd;line-height:1.35}</style>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div><h1>Dashboard Metrics</h1><div class="note">Enter Twitch name. The iframe URL is <span id="urlText">https://twitchtracker.com/technoconqueror</span></div></div>
+      <div class="controls"><input id="channel" value="technoconqueror" placeholder="Twitch name" /><button id="load">Load Dashboard</button><a id="open" href="https://twitchtracker.com/technoconqueror" target="_blank" rel="noopener">Open Direct</a><a href="../index.html">Menu</a></div>
+    </header>
+    <div class="frameWrap"><iframe id="dash" title="TwitchTracker Dashboard" src="https://twitchtracker.com/technoconqueror" referrerpolicy="no-referrer-when-downgrade"></iframe></div>
+  </div>
+  <script>
+    const clean=v=>String(v||'technoconqueror').trim().toLowerCase().replace(/[^a-z0-9_]/g,'')||'technoconqueror';
+    function load(){const c=clean(document.getElementById('channel').value);const url='https://twitchtracker.com/'+encodeURIComponent(c);document.getElementById('dash').src=url;document.getElementById('open').href=url;document.getElementById('urlText').textContent=url;localStorage.setItem('dashboardChannel',c)}
+    document.getElementById('load').onclick=load;document.getElementById('channel').addEventListener('keydown',e=>{if(e.key==='Enter')load()});document.getElementById('channel').value=localStorage.getItem('dashboardChannel')||'technoconqueror';load();
+  </script>
+</body>
+</html>

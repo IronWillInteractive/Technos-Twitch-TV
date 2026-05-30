@@ -1,0 +1,29 @@
+/* PRO-CRAWL OS shared professional shell */
+:root{
+  --pc-bg:#050505;
+  --pc-panel:#0b111d;
+  --pc-panel-2:#111827;
+  --pc-border:rgba(148,163,184,.16);
+  --pc-text:#e5e7eb;
+  --pc-muted:#9ca3af;
+  --pc-emerald:#34d399;
+  --pc-cyan:#22d3ee;
+  --pc-shadow:0 24px 80px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+html{height:100%;background:#020617}
+body{min-height:100%;touch-action:manipulation;text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased;background:radial-gradient(circle at top left,rgba(16,185,129,.12),transparent 35%),radial-gradient(circle at bottom right,rgba(34,211,238,.10),transparent 30%),#020617}
+a{color:inherit}
+button,input,select,textarea{font:inherit}
+button{min-height:34px}
+textarea,input,select{touch-action:manipulation}
+#control-panel{box-shadow:20px 0 80px rgba(0,0,0,.24)}
+#prompter-viewport{background-image:radial-gradient(circle at 50% 0%,rgba(52,211,153,.08),transparent 42%),linear-gradient(180deg,rgba(255,255,255,.03),transparent 20%)}
+#prompter-scroll-area{overscroll-behavior:contain;scrollbar-gutter:stable both-edges}
+#prompter-text-container{text-shadow:0 2px 24px rgba(0,0,0,.78);max-width:1600px;word-break:normal;overflow-wrap:anywhere}
+#floating-bar{box-shadow:var(--pc-shadow)}
+#countdown-overlay{backdrop-filter:blur(16px)}
+#preset-card-list .line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+#mobile-dock{display:none}
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.001ms!important}}
+@media print{header,#control-panel,#floating-bar,#mobile-dock,#countdown-overlay{display:none!important}body{overflow:visible!important;background:#fff!important;color:#000!important}#workspace,#prompter-viewport,#prompter-scroll-area{display:block!important;height:auto!important;overflow:visible!important;background:#fff!important}#prompter-text-container{color:#000!important;text-shadow:none!important;font-size:24pt!important;width:100%!important}}

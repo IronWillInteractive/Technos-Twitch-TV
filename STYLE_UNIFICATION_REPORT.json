@@ -1,0 +1,82 @@
+{
+  "index.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 0
+  },
+  "pages/about.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 0
+  },
+  "pages/discovery.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 0
+  },
+  "pages/live.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 1
+  },
+  "pages/comms.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 0
+  },
+  "pages/games.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 0
+  },
+  "pages/past-streams.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 0
+  },
+  "pages/clips.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 0
+  },
+  "pages/uploads.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 0
+  },
+  "pages/highlights.html": {
+    "exists": true,
+    "uses_site_css": true,
+    "has_header": true,
+    "has_footer": true,
+    "bad_public_terms": [],
+    "inline_style_blocks": 0
+  }
+}

@@ -1,0 +1,45 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Uploads | TechnoVerse</title><meta name="description" content="Browse Technoconqueror uploaded videos and extra Twitch content."><meta name="keywords" content="Technoconqueror, Wambo, Wambolonian1776, Mathew McGehee, Walker Louisiana, Twitch streamer, gaming, vlogging, Iron Will Interactive"><meta name="author" content="Iron Will Interactive"><meta name="robots" content="index,follow"><link rel="canonical" href="https://gamedev44.github.io/IronWill/"><meta property="og:type" content="website"><meta property="og:title" content="Uploads | TechnoVerse"><meta property="og:description" content="Browse Technoconqueror uploaded videos and extra Twitch content."><meta property="og:site_name" content="TechnoVerse"><meta name="twitter:card" content="summary_large_image"><meta name="theme-color" content="#5936ff"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Inter:wght@400;600;800;900&family=Rajdhani:wght@500;700&display=swap" rel="stylesheet"><link rel="stylesheet" href="../assets/css/site.css"></head><body><header class="siteNav"><div class="wrap navInner"><a class="brand" href="../index.html" aria-label="TechnoVerse home"><span class="brandMark">TV</span><span><b>TechnoVerse</b><small>Technoconqueror • Wambo</small></span></a><button class="menuBtn" data-menu aria-label="Open navigation">☰</button><nav class="navLinks" data-links><a data-nav href="../index.html">Home</a><a data-nav href="../pages/discovery.html">Discovery</a><a data-nav href="../pages/about.html">About</a><a data-nav href="../pages/live.html">Live</a><a data-nav href="../pages/comms.html">Comms</a><a data-nav href="../pages/past-streams.html">Past Streams</a><a data-nav href="../pages/clips.html">Clips</a><a data-nav href="../pages/uploads.html">Uploads</a><a data-nav href="../pages/highlights.html">Highlights</a><a data-nav href="../pages/games.html">Games</a></nav><a class="twitchBtn" href="https://www.twitch.tv/technoconqueror" target="_blank" rel="noopener">Twitch</a></div></header><main>
+<section class="miniHero wrap"><div class="eyebrow">Uploads</div><h1 class="pageTitle"><span class="grad">Uploads</span></h1><p class="sub">Browse Technoconqueror uploaded videos and extra Twitch content.</p></section>
+<section class="section wrap">
+  <div class="panel pad mediaPortalHero">
+    <div>
+      <div class="mediaPortalIcon">⬆</div>
+      <h2 class="title"><span class="grad">Uploads</span></h2>
+      <p class="mediaPortalLead">Continue to Twitch to view Wambo’s uploads. TechnoVerse will stay open here so you can come back to Live, Comms, or the game library anytime.</p>
+      <div class="mediaPortalActions">
+        <button class="btn primary" type="button" data-open-external>View Uploads</button>
+        <a class="btn ghost" href="../pages/live.html">Watch Live</a>
+        <a class="btn ghost" href="../pages/comms.html">Open Comms</a>
+      </div>
+    </div>
+  </div>
+  <div class="mediaInfoGrid"><div class="mediaInfoCard"><b>Extra Content</b><span>Uploaded videos, updates, edits, and channel material.</span></div><div class="mediaInfoCard"><b>Watch Anytime</b><span>Use this when you want content beyond the live stream.</span></div><div class="mediaInfoCard"><b>Viewer Hub</b><span>Return here for Live, Comms, Games, and discovery.</span></div></div>
+</section>
+</main>
+<div class="viewerModal" data-external-modal aria-hidden="true">
+  <section class="viewerDialog" role="dialog" aria-modal="true" aria-labelledby="externalTitle">
+    <div class="viewerDialogTop">
+      <h2 id="externalTitle">Open Uploads?</h2>
+      <button class="modalClose" type="button" data-close-external aria-label="Close">×</button>
+    </div>
+    <div class="viewerDialogBody">
+      <p>You are about to open Wambo’s <b>Uploads</b> on Twitch.</p>
+      <p>The Twitch page opens in a new tab so this viewer hub stays ready in the background.</p>
+      <div class="modalActions">
+        <a class="btn primary" href="https://www.twitch.tv/technoconqueror/videos?filter=uploads&amp;sort=time" target="_blank" rel="noopener">Continue to Twitch</a>
+        <button class="btn ghost" type="button" data-close-external>Stay Here</button>
+      </div>
+    </div>
+  </section>
+</div>
+<footer class="siteFooter"><div class="wrap footerGrid"><div><b>TechnoVerse</b><p>Community viewer hub for Mathew McGehee / Technoconqueror.</p></div><div class="footerLinks"><a href="../pages/live.html">Live</a><a href="../pages/comms.html">Comms</a><a href="../pages/games.html">Games</a><a href="https://gamedev44.github.io/IronWill/" target="_blank" rel="noopener">Iron Will</a></div></div><div class="powered">Powered by <a href="https://gamedev44.github.io/IronWill/" target="_blank" rel="noopener">Iron Will Interactive</a></div></footer><script src="../assets/js/site.js"></script><script>
+(function(){
+  const modal=document.querySelector('[data-external-modal]');
+  const open=()=>{if(!modal)return;modal.classList.add('isOpen');modal.setAttribute('aria-hidden','false');document.body.classList.add('modalLocked');};
+  const close=()=>{if(!modal)return;modal.classList.remove('isOpen');modal.setAttribute('aria-hidden','true');document.body.classList.remove('modalLocked');};
+  document.querySelectorAll('[data-open-external]').forEach(btn=>btn.addEventListener('click',open));
+  document.querySelectorAll('[data-close-external]').forEach(btn=>btn.addEventListener('click',close));
+  if(modal)modal.addEventListener('click',e=>{if(e.target===modal)close();});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape')close();});
+})();
+</script></body></html>
